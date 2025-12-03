@@ -1,0 +1,7 @@
+[package]
+name = "one-million-crabs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+common-game = {path = "/Users/marco/Desktop/common/app/game"}
