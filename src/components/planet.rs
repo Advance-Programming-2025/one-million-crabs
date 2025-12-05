@@ -4,9 +4,7 @@ use std::sync::mpsc;
 use common_game::components::planet::{Planet, PlanetAI, PlanetState, PlanetType};
 use common_game::components::resource::BasicResourceType::Carbon;
 use common_game::components::resource::ComplexResourceType::Diamond;
-use common_game::components::resource::{
-    BasicResource, BasicResourceType, Combinator, ComplexResource, ComplexResourceRequest, Dolphin, Generator
-};
+use common_game::components::resource::{BasicResource, BasicResourceType, Combinator, ComplexResource, ComplexResourceRequest, Dolphin, Generator, GenericResource};
 use common_game::components::rocket::Rocket;
 use common_game::protocols::messages::{
     ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
@@ -179,38 +177,40 @@ impl PlanetAI for AI {
             }
             //TODO use explorer_id to send the gen resource to correct Explorer
             ExplorerToPlanet::CombineResourceRequest { explorer_id, msg } => {
-                // controllo se c'è una cella carica
+                // searching the index of the first free cell
                 let cell_idx = (0..N_CELLS).find(|&i| state.cell(i).is_charged());
                 if let Some(cell_idx) = cell_idx {
-                    // se c'è una cella carica e la risorsa è supportata vado avanti
-                    // ottengo la cella da passare al generator
                     let cell = state.cell_mut(cell_idx);
-                    // pattern matching per generare la risorsa corretta
-                    let complex_resource = match msg {
+                    // pattern matching to generate the correct resource
+                    let complex_resource: Result<ComplexResource, (String, GenericResource, GenericResource)> = match msg {
                         ComplexResourceRequest::Water(r1, r2) => combinator
                             .make_water(r1, r2, cell)
                             .map(ComplexResource::Water)
-                            .map_err(|(e, _, _)| e), // il map_err serve per trasformare l'err in una stringa sola in modo da poter usare il match
+                            .map_err(|(e, r1, r2)| { (e , GenericResource::BasicResources(BasicResource::Hydrogen(r1)), GenericResource::BasicResources(BasicResource::Oxygen(r2)))}),
                         ComplexResourceRequest::Diamond(r1, r2) => combinator
                             .make_diamond(r1, r2, cell)
                             .map(ComplexResource::Diamond)
-                            .map_err(|(e, _, _)| e),
+                            .map_err(|(e, r1, r2)| { (e , GenericResource::BasicResources(BasicResource::Carbon(r1)), GenericResource::BasicResources(BasicResource::Carbon(r2)))}),
                         ComplexResourceRequest::Life(r1, r2) => combinator
                             .make_life(r1, r2, cell)
                             .map(ComplexResource::Life)
-                            .map_err(|(e, _, _)| e),
+                            .map_err(|(e, r1, r2)| { (e , GenericResource::ComplexResources(ComplexResource::Water(r1)), GenericResource::BasicResources(BasicResource::Carbon(r2)))}),
+
                         ComplexResourceRequest::Robot(r1, r2) => combinator
                             .make_robot(r1, r2, cell)
                             .map(ComplexResource::Robot)
-                            .map_err(|(e, _, _)| e),
+                            .map_err(|(e, r1, r2)| { (e , GenericResource::BasicResources(BasicResource::Silicon(r1)), GenericResource::ComplexResources(ComplexResource::Life(r2)))}),
+
                         ComplexResourceRequest::Dolphin(r1, r2) => combinator
                             .make_dolphin(r1, r2, cell)
                             .map(ComplexResource::Dolphin)
-                            .map_err(|(e, _, _)| e),
+                            .map_err(|(e, r1, r2)| { (e , GenericResource::ComplexResources(ComplexResource::Water(r1)), GenericResource::ComplexResources(ComplexResource::Life(r2)))}),
+
                         ComplexResourceRequest::AIPartner(r1, r2) => combinator
                             .make_aipartner(r1, r2, cell)
                             .map(ComplexResource::AIPartner)
-                            .map_err(|(e, _, _)| e),
+                            .map_err(|(e, r1, r2)| { (e , GenericResource::ComplexResources(ComplexResource::Robot(r1)), GenericResource::ComplexResources(ComplexResource::Diamond(r2)))}),
+
                     };
                     // controllo il risultato di complex_resource
                     match complex_resource {
@@ -220,14 +220,16 @@ impl PlanetAI for AI {
                             });
                         }
                         Err(err) => {
-                            println!("{}", err);
+                            println!("{}", err.0);
+                            return Some(PlanetToExplorer::CombineResourceResponse {
+                                complex_response: Err(err),
+                            });
                         }
                     }
+                } else {
+                    // TODO handle error, at the moment if there is no cell available the "else" block will be exited and None will be returned
+                    println!("No available cell found");
                 }
-                // TODO change to the right respose
-                // Some(PlanetToExplorer::CombineResourceResponse {
-                //     complex_response: None,
-                // })
                 None
             }
         }
@@ -239,8 +241,7 @@ impl PlanetAI for AI {
         generator: &Generator,
         combinator: &Combinator,
     ) -> Option<Rocket> {
-        // state.take_rocket()
-        None
+        state.take_rocket()
     }
 
     fn start(&mut self, state: &PlanetState) {
