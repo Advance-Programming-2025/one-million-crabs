@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 use std::thread;
 
-use common_game::components::generator::Generator;
+use common_game::components::forge::Forge;
 use common_game::components::planet::Planet;
 use common_game::protocols::messages::{
     ExplorerToOrchestrator, ExplorerToPlanet, OrchestratorToExplorer, OrchestratorToPlanet,
@@ -13,7 +13,7 @@ use crate::components::explorer::{BagType, Explorer};
 
 // B generic is there for representing the content type of the bag
 pub struct Orchestrator {
-    generator: Generator,
+    forge: Forge,
 
     galaxy_topology: Vec<Planet>, //At the moment we need only one planet for testing
     explorers: Vec<Explorer>,     //At the momet we need only one explorer for testing
@@ -72,7 +72,7 @@ impl Orchestrator {
             mpsc::Receiver<ExplorerToPlanet>,
         ) = mpsc::channel();
 
-        let planet_to_explorer_channels = (planet_receiver, planet_sender);
+        let planet_to_explorer_channels = planet_receiver;
         let explorer_to_planet_channels = (explorer_receiver, explorer_sender);
 
         //explorer-orchestrator and orchestrator-explorer
@@ -105,7 +105,7 @@ impl Orchestrator {
         let explorers = vec![explorer];
         Ok(
             Self { 
-                generator: Generator::new()?, 
+                forge: Forge::new()?, 
                 galaxy_topology: galaxy, 
                 explorers, 
                 planet_channels: orchestrator_to_planet_channels, 
@@ -140,7 +140,7 @@ impl Orchestrator {
             // };
 
             println!("Send Asteroid to Planet");
-            let planet_message = self.planet_channels.1.send(OrchestratorToPlanet::Asteroid(self.generator.generate_asteroid()));
+            let planet_message = self.planet_channels.1.send(OrchestratorToPlanet::Asteroid(self.forge.generate_asteroid()));
             let planet_response = match self.planet_channels.0.recv(){
                 Ok(res)=>res,
                 Err(_)=>{
@@ -149,7 +149,7 @@ impl Orchestrator {
             };
             println!("Planet should have finished running...");
 
-            let planet_message = match self.planet_channels.1.send(OrchestratorToPlanet::Asteroid(self.generator.generate_asteroid())){
+            let planet_message = match self.planet_channels.1.send(OrchestratorToPlanet::Asteroid(self.forge.generate_asteroid())){
                 Ok(_)=>println!("PLANET STILL WORKING..."),
                 Err(_)=>{
                     println!("Everthing is okey...");
