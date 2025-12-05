@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
+use common_game::components::asteroid::Asteroid;
 // use std::time::SystemTime;
 use common_game::components::planet::{Planet, PlanetAI, PlanetState, PlanetType};
 use common_game::components::resource::BasicResourceType::Carbon;
@@ -91,6 +92,30 @@ impl PlanetAI for AI {
                     }
                 }
                 None
+            }
+            OrchestratorToPlanet::Asteroid(_) => {
+                // success case, the planet has a rocket and it does 
+                // exist
+                if state.can_have_rocket() {
+                    if state.take_rocket().is_some() {
+                        // destroyed refers to the planet
+                        return Some(PlanetToOrchestrator::AsteroidAck {
+                            planet_id: state.id(),
+                            destroyed: false,
+                        });
+                    }
+                }
+
+                // failure case, the planet either can't build rockets or
+                // it hasn't built one in time
+                return Some(PlanetToOrchestrator::AsteroidAck {
+                    planet_id: state.id(),
+                    destroyed: true,
+                });
+
+                // REVIEW: from what i read, the planet isn't supposed to make itself
+                // explode as that is the orchestrator's responsibility.
+                // is this true, chat?
             }
             _ => None,
         }
