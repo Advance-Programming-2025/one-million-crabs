@@ -73,13 +73,11 @@ impl PlanetAI for AI {
     ) -> Option<PlanetToOrchestrator> {
         match msg {
             OrchestratorToPlanet::InternalStateRequest => {
-                //REVIEW check if the common code is fixed
-                // Some(PlanetToOrchestrator::InternalStateResponse {
-                //     planet_id: state.id().clone(),
-                //     planet_state: state.clone(), //TODO non so come passare state, vuole un PlanetState, ma PlanetState non implementa Clone o Copy, e non mi permette di fare la "move" perché arriva come shared mutable reference
-                //                                  // timestamp: SystemTime::now(),
-                // })
-                None
+                Some(PlanetToOrchestrator::InternalStateResponse {
+                    planet_id: state.id().clone(),
+                    planet_state: PlanetState::to_dummy(&state)
+                                                 // timestamp: SystemTime::now(),
+                })
             }
             OrchestratorToPlanet::Sunray(sunray) => {
                 for i in 0..N_CELLS {
@@ -171,7 +169,9 @@ impl PlanetAI for AI {
                     println!("No available cell found"); // non dovrebbe accadere, si spera che l'explorer chieda se ce ne è una libera
                 }
                 Some(PlanetToExplorer::GenerateResourceResponse {
-                    //TODO ritorno come ho fatto o direttamente None?
+                    //TA: TODO ritorno come ho fatto o direttamente None?
+                    //DDC: io terrei cosi', esplicita il fatto che questo sia un caso
+                    //di errore ma comunque atteso. dipende anche dalla spec
                     resource: None,
                 })
             }
