@@ -1,20 +1,34 @@
 use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 use std::sync::{mpsc, LockResult};
 // use std::time::SystemTime;
 use common_game::components::planet::{Planet, PlanetAI, PlanetState, PlanetType};
 use common_game::components::resource::BasicResourceType::Carbon;
 use common_game::components::resource::ComplexResourceType::Diamond;
+use common_game::components::resource::ComplexResourceType;
 use common_game::components::resource::{BasicResource, BasicResourceType, Combinator, ComplexResource, ComplexResourceRequest, Dolphin, Generator, GenericResource};
 use common_game::components::rocket::Rocket;
 use common_game::protocols::messages::{
     ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
 };
 use common_game::protocols::messages::OrchestratorToPlanet::Asteroid;
+use common_game::logging::{ActorType, Channel, Payload, EventType, LogEvent};
 use crate::components::planet::stacks::{CHARGED_CELL_STACK, FREE_CELL_STACK};
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 // CrabRave Constructor
 ///////////////////////////////////////////////////////////////////////////////////////////
+#[macro_export]
+macro_rules! planet_debug {
+    ($id:expr, $fmt:expr $(, $args:expr)* $(,)?) => { //the log macro takes the id of the planet a format of debug message and zero or more args
+                                                      // optionally a ',' is accepted after the args
+        {
+            if log::log_enabled!(log::Level::Debug) {
+                log::debug!(target: "planet", concat!("[planet {}] ", $fmt), $id $(, $args)*);
+            }
+        }
+    };
+}
 pub struct CrabRaveConstructor;
 
 impl CrabRaveConstructor {
@@ -34,6 +48,10 @@ impl CrabRaveConstructor {
             orchestrator_channels,
             explorer_channels,
         );
+        let mut payload= Payload::new();
+        payload.insert(String::from("gen_rules"), gen_rules.iter().map(|x| x.res_to_string()+", ").collect());
+        payload.insert(String::from("comb_rules"), comb_rules.iter().map(|x| x.res_to_string()+", ").collect());
+        //it would be nice to log if the orchestrator is connected but i don't think is possible with std::sync
         let new_planet = Planet::new(
             id,
             planet_type,
@@ -43,6 +61,8 @@ impl CrabRaveConstructor {
             orchestrator_channels,
             explorer_channels,
         )?;
+        let event= LogEvent::new(ActorType::Orchestrator, 0u64, ActorType::Planet, id.to_string(), EventType::MessageOrchestratorToPlanet, Channel::Debug, payload);
+        planet_debug!(id, "Planet created");
         Ok(new_planet)
     }
 }
@@ -399,13 +419,29 @@ fn peek_charged_cell_index() -> Option<u32> {
     }
 }
 
+pub trait ResToString{
+    fn res_to_string(&self) -> String;
+}
 
-#[macro_export]
-macro_rules! planet_debug {
-    // with planet id and format args
-    ($planet_id:expr, $($arg:tt)*) => {{
-        if log::log_enabled!(log::Level::Debug) {
-            log::debug!(target: "planet", "[planet {}] {}", $planet_id, format!($($arg)*));
+impl ResToString for BasicResourceType{
+    fn res_to_string(&self) -> String {
+        match self {
+            BasicResourceType::Carbon=>String::from("carbon"),
+            BasicResourceType::Hydrogen=>String::from("hydrogen"),
+            BasicResourceType::Oxygen=>String::from("oxygen"),
+            BasicResourceType::Silicon=>String::from("silicon"),
         }
-    }};
+    }
+}
+impl ResToString for ComplexResourceType{
+    fn res_to_string(&self) -> String {
+        match self {
+            ComplexResourceType::AIPartner=>String::from("AIPartner"),
+            ComplexResourceType::Diamond=>String::from("Diamond"),
+            ComplexResourceType::Life=>String::from("Life"),
+            ComplexResourceType::Robot=>String::from("Robot"),
+            ComplexResourceType::Water=>String::from("Water"),
+            ComplexResourceType::Dolphin => String::from("Dolphin"),
+        }
+    }
 }
