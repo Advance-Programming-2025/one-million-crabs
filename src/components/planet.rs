@@ -169,12 +169,12 @@ impl PlanetAI for AI {
             }
             ExplorerToPlanet::SupportedResourceRequest { explorer_id: _ } => {
                 Some(PlanetToExplorer::SupportedResourceResponse {
-                    resource_list: HashSet::new(), //TODO add correct HashSet
+                    resource_list: generator.all_available_recipes()
                 })
             }
             ExplorerToPlanet::SupportedCombinationRequest { explorer_id: _ } => {
                 Some(PlanetToExplorer::SupportedCombinationResponse {
-                    combination_list: HashSet::new(), //TODO add correct HashSet
+                    combination_list: combinator.all_available_recipes() 
                 })
             }
 
