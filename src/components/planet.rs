@@ -264,45 +264,42 @@ impl PlanetAI for AI {
         generator: &Generator,
         combinator: &Combinator,
     ) -> Option<Rocket> {
-        if !state.has_rocket(){ // TODO this is the case in which we do not have a planet with rockets, if so we can return None anyway (to be removed if our planet is of a rocket type)
+        //if the planet can't build rockets, you're screwed
+        if !state.can_have_rocket() {
             return None;
         }
 
-        // if there is no rocket at the moment, try to build one (if there is a charged energy cell available)
+        //if you've already got a rocket ready, use it!
+        if state.has_rocket() {
+            return state.take_rocket();
+        }
 
-        // try to take the rocket
-        let mut res = state.take_rocket();
-        if res.is_none() {
-
-            // try to find the charged energy cell
-            if let Some(idx) = get_charged_cell_index() {
-
-                // try to build the rocket
-                match state.build_rocket(idx as usize) {
-                    Ok(_) => {
-
-                        // discharging the cell used to build the rocket
-                        push_free_cell(idx);
-                        match state.cell_mut(idx as usize).discharge() {
-                            Ok(_) => {
-                                println!("Used a charged cell at index {}, to build a rocket", idx);
-                            }
-                            Err(err) => {
-                                println!("{}", err);
-                            }
+        //try to build a rocket if you have any energy left
+        if let Some(idx) = get_charged_cell_index() {
+            match state.build_rocket(idx as usize) {
+                Ok(_) => {
+                    push_free_cell(idx);
+                    match state.cell_mut(idx as usize).discharge() {
+                        //build was successful, log the rocket creation
+                        Ok(_) => {
+                            println!("Used a charged cell at index {}, to build a rocket", idx);
                         }
-
-                        // taking the new rocket
-                        res = state.take_rocket();
+                        Err(err) => {
+                            println!("{}", err);
+                        }
                     }
-                    Err(err) => {
-                        push_free_cell(idx);
-                        println!("{}", err);
-                    }
+                    return state.take_rocket();
+                }
+                //build failed, log the error and return none
+                Err(err) => {
+                    push_free_cell(idx);
+                    println!("{}", err);
+                    return None;
                 }
             }
         }
-        res
+        //shouldn't be able to get here, but just in case...
+        None
     }
 
     fn start(&mut self, state: &PlanetState) {
