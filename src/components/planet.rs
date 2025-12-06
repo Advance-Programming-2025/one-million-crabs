@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{mpsc, LockResult};
-// use std::time::SystemTime;
 use common_game::components::planet::{Planet, PlanetAI, PlanetState, PlanetType};
 use common_game::components::resource::BasicResourceType::Carbon;
 use common_game::components::resource::ComplexResourceType::Diamond;
@@ -9,8 +8,8 @@ use common_game::components::rocket::Rocket;
 use common_game::protocols::messages::{
     ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
 };
-use common_game::protocols::messages::OrchestratorToPlanet::Asteroid;
-use crate::components::planet::stacks::{CHARGED_CELL_STACK, FREE_CELL_STACK};
+
+use crate::components::energy_stacks::stacks::{initialize_free_cell_stack, push_free_cell, push_charged_cell, peek_charged_cell_index, get_free_cell_index, get_charged_cell_index};
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 // CrabRave Constructor
@@ -51,7 +50,7 @@ impl CrabRaveConstructor {
 // PlanetAI
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-const N_CELLS: usize = 5; // based on the planet
+// REMEMBER -> N_CELLS is in energy_stacks.rs mod
 
 pub struct AI;
 
@@ -313,89 +312,6 @@ impl PlanetAI for AI {
     fn stop(&mut self, _state: &PlanetState) {
         println!("Planet AI stopped");
         // TODO stessa cosa di "start"
-    }
-}
-
-mod stacks {
-    use std::sync::Mutex;
-    pub(super) static FREE_CELL_STACK: Mutex<Vec<u32>> = Mutex::new(Vec::new());
-    pub(super) static CHARGED_CELL_STACK: Mutex<Vec<u32>> = Mutex::new(Vec::new());
-}
-
-fn initialize_free_cell_stack(){
-    let free_cell_stack = FREE_CELL_STACK.lock();
-    match free_cell_stack {
-        Ok(mut vec) => {
-            for i in 0..N_CELLS {
-                vec.push(i as u32);
-            }
-        }
-        Err(err) => {
-            println!("{}", err);
-        }
-    }
-}
-
-fn get_free_cell_index() -> Option<u32> {
-    let free_cell_stack = FREE_CELL_STACK.lock();
-    match free_cell_stack {
-        Ok(mut vec) => {
-            vec.pop()
-        }
-        Err(err) => {
-            println!("{}", err);
-            None
-        }
-    }
-}
-
-fn get_charged_cell_index() -> Option<u32> {
-    let charged_cell_stack = CHARGED_CELL_STACK.lock();
-    match charged_cell_stack {
-        Ok(mut vec) => {
-            vec.pop()
-        }
-        Err(err) => {
-            println!("{}", err);
-            None
-        }
-    }
-}
-
-fn push_free_cell(index: u32) {
-    let free_cell_stack = FREE_CELL_STACK.lock();
-    match free_cell_stack {
-        Ok(mut vec) => {
-            vec.push(index);
-        }
-        Err(err) => {
-            println!("{}", err);
-        }
-    }
-}
-
-fn push_charged_cell(index: u32) {
-    let charged_cell_stack = CHARGED_CELL_STACK.lock();
-    match charged_cell_stack {
-        Ok(mut vec) => {
-            vec.push(index);
-        }
-        Err(err) => {
-            println!("{}", err);
-        }
-    }
-}
-
-fn peek_charged_cell_index() -> Option<u32> {
-    let charged_cell_stack = CHARGED_CELL_STACK.lock();
-    match charged_cell_stack {
-        Ok(vec) => {
-            vec.last().copied()
-        }
-        Err(err) => {
-            println!("{}", err);
-            None
-        }
     }
 }
 
