@@ -342,3 +342,62 @@ impl PlanetAI for AI {
     }
 }
 
+
+#[cfg(test)]
+mod planet{
+    use std::sync::mpsc;
+
+    use common_game::protocols::messages::{ExplorerToOrchestrator, ExplorerToPlanet, OrchestratorToExplorer, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator};
+
+    use crate::components::{CrabRaveConstructor, explorer::BagType, orchestrator};
+
+    #[test]
+    fn t01_planet_initialization()->Result<(),String>{
+        let (planet_sender, orch_receiver): (
+            mpsc::Sender<PlanetToOrchestrator>,
+            mpsc::Receiver<PlanetToOrchestrator>,
+        ) = mpsc::channel();
+        let (orch_sender, planet_receiver): (
+            mpsc::Sender<OrchestratorToPlanet>,
+            mpsc::Receiver<OrchestratorToPlanet>,
+        ) = mpsc::channel();
+
+        let planet_to_orchestrator_channels = (planet_receiver, planet_sender);
+        let orchestrator_to_planet_channels = (orch_receiver, orch_sender);
+
+        //planet-explorer and explorer-planet
+        let (planet_sender, explorer_receiver): (
+            mpsc::Sender<PlanetToExplorer>,
+            mpsc::Receiver<PlanetToExplorer>,
+        ) = mpsc::channel();
+        let (explorer_sender, planet_receiver): (
+            mpsc::Sender<ExplorerToPlanet>,
+            mpsc::Receiver<ExplorerToPlanet>,
+        ) = mpsc::channel();
+
+        let planet_to_explorer_channels = planet_receiver;
+        let explorer_to_planet_channels = (explorer_receiver, explorer_sender);
+
+        //explorer-orchestrator and orchestrator-explorer
+        let (explorer_sender, orch_receiver): (
+            mpsc::Sender<ExplorerToOrchestrator<BagType>>,
+            mpsc::Receiver<ExplorerToOrchestrator<BagType>>,
+        ) = mpsc::channel();
+        let (orch_sender, explorer_receiver): (
+            mpsc::Sender<OrchestratorToExplorer>,
+            mpsc::Receiver<OrchestratorToExplorer>,
+        ) = mpsc::channel();
+
+        let explorer_to_orchestrator_channels = (explorer_receiver, explorer_sender);
+        let orchestrator_to_explorer_channels = (orch_receiver, orch_sender);
+
+        //Construct crab-rave planet
+        let mut crab_rave_planet = CrabRaveConstructor::new(
+            0,
+            planet_to_orchestrator_channels,
+            planet_to_explorer_channels,
+        )?;
+        Ok(())
+    }
+    
+}
