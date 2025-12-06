@@ -100,43 +100,6 @@ impl PlanetAI for AI {
                 }
                 None
             }
-            OrchestratorToPlanet::Asteroid(_) => {
-                // success case, the planet has a rocket and it does 
-                // exist
-                if state.can_have_rocket() {
-                    if state.take_rocket().is_some() {
-                        // destroyed refers to the planet
-                        return Some(PlanetToOrchestrator::AsteroidAck {
-                            planet_id: state.id(),
-                            destroyed: false,
-                        });
-                    }
-                }
-
-                // failure case, the planet either can't build rockets or
-                // it hasn't built one in time
-                return Some(PlanetToOrchestrator::AsteroidAck {
-                    planet_id: state.id(),
-                    destroyed: true,
-                });
-
-                // REVIEW: from what i read, the planet isn't supposed to make itself
-                // explode as that is the orchestrator's responsibility.
-                // is this true, chat?
-            }
-            OrchestratorToPlanet::StartPlanetAI => {
-                //TODO: handle eventual double requests
-                self.start(state);
-                
-                Some(PlanetToOrchestrator::StartPlanetAIResult { planet_id: state.id() })
-            }
-            OrchestratorToPlanet::StopPlanetAI => {
-                //TODO: handle eventual double requests
-                self.stop(state);
-                
-                Some(PlanetToOrchestrator::StopPlanetAIResult { planet_id: state.id() })
-            }
-            //TODO match mancanti: IncomingExplorerRequest, OutgoingExplorerRequest
             _ => None,
         }
     }
