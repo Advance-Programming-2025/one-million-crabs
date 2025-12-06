@@ -57,8 +57,10 @@ pub struct AI;
 
 impl AI {
     fn new() -> Self {
-        // TODO non so se va qui o nello start AI
-        initialize_free_cell_stack(); // TODO rimuovere se si sceglie la vecchia implementazione
+        // the cell stack needs to be started here
+        // otherwise it would get reset when the AI
+        // gets stopped
+        initialize_free_cell_stack(); // REVIEW rimuovere se si sceglie la vecchia implementazione
         Self
     }
 }
@@ -249,9 +251,34 @@ impl PlanetAI for AI {
                         }
                     }
                 } else {
-                    // TODO handle error, at the moment if there is no cell available the "else" block will be exited and None will be returned
-                    // TODO and the resources will be gone :)
                     println!("No available cell found");
+                    let (ret1,ret2) = match msg {
+                        ComplexResourceRequest::Water(r1, r2) => {
+                            (GenericResource::BasicResources(BasicResource::Hydrogen(r1)),
+                            GenericResource::BasicResources(BasicResource::Oxygen(r2)))
+                        }
+                        ComplexResourceRequest::AIPartner(r1, r2) => {
+                            (GenericResource::ComplexResources(ComplexResource::Robot(r1)),
+                            GenericResource::ComplexResources(ComplexResource::Diamond(r2)))
+                        }
+                        ComplexResourceRequest::Life(r1, r2) => {
+                            (GenericResource::ComplexResources(ComplexResource::Water(r1)),
+                            GenericResource::BasicResources(BasicResource::Carbon(r2)))
+                        }
+                        ComplexResourceRequest::Diamond(r1, r2) => {
+                            (GenericResource::BasicResources(BasicResource::Carbon(r1)),
+                            GenericResource::BasicResources(BasicResource::Carbon(r2)))
+                        }
+                        ComplexResourceRequest::Dolphin(r1, r2) => {
+                            (GenericResource::ComplexResources(ComplexResource::Water(r1)),
+                            GenericResource::ComplexResources(ComplexResource::Life(r2)))
+                        }
+                        ComplexResourceRequest::Robot(r1, r2) => {
+                            (GenericResource::BasicResources(BasicResource::Silicon(r1)),
+                            GenericResource::ComplexResources(ComplexResource::Life(r2)))
+                        }
+                    };
+                    return Some(PlanetToExplorer::CombineResourceResponse { complex_response: Err(("no available cell".to_string(),ret1, ret2)) });
                 }
                 None
             }
