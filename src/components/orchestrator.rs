@@ -43,8 +43,7 @@ impl Orchestrator {
     pub fn initialize_galaxy(/*_path: &str*/) -> Result<Orchestrator, String> {
         //env_logger::init(); //initialize logging backend, this is only for testing purpose,
         // in the final implementation the logging backend will be initialized in the orchestrator
-        Logger::try_with_env().unwrap().start().unwrap();
-
+        flexi_logger::init();
         // Orchestrator know the file path where the galaxy topology is written and also the type of each planet
         /*
             Steps of initialization:
