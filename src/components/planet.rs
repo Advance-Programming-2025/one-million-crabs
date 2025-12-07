@@ -64,7 +64,7 @@ impl CrabRaveConstructor {
             explorer_channels,
         )?;
         let event= LogEvent::new(ActorType::Orchestrator, 0u64, ActorType::Planet, id.to_string(), EventType::MessageOrchestratorToPlanet, Channel::Debug, payload);
-        planet_debug!(id, "Planet created");
+        planet_debug!(id, "Planet created. {}", event);
         Ok(new_planet)
     }
 }
@@ -365,10 +365,37 @@ impl PlanetAI for AI {
     }
 }
 
+pub trait ResToString{
+    fn res_to_string(&self) -> String;
+}
+
+impl ResToString for BasicResourceType{
+    fn res_to_string(&self) -> String {
+        match self {
+            BasicResourceType::Carbon=>String::from("carbon"),
+            BasicResourceType::Hydrogen=>String::from("hydrogen"),
+            BasicResourceType::Oxygen=>String::from("oxygen"),
+            BasicResourceType::Silicon=>String::from("silicon"),
+        }
+    }
+}
+impl ResToString for ComplexResourceType{
+    fn res_to_string(&self) -> String {
+        match self {
+            ComplexResourceType::AIPartner=>String::from("AIPartner"),
+            ComplexResourceType::Diamond=>String::from("Diamond"),
+            ComplexResourceType::Life=>String::from("Life"),
+            ComplexResourceType::Robot=>String::from("Robot"),
+            ComplexResourceType::Water=>String::from("Water"),
+            ComplexResourceType::Dolphin => String::from("Dolphin"),
+        }
+    }
+}
 
 #[cfg(test)]
 mod planet{
     //use std::sync::mpsc;
+    use log::{debug, error, log_enabled, info, Level};
     use crossbeam_channel::{Sender, Receiver, select, unbounded};
     use common_game::protocols::messages::{ExplorerToOrchestrator, ExplorerToPlanet, OrchestratorToExplorer, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator};
 
@@ -376,6 +403,8 @@ mod planet{
 
     #[test]
     fn t01_planet_initialization()->Result<(),String>{
+        env_logger::init(); //initialize logging backend, this is only for testing purpose,
+                            // in the final implementation the logging backend will be initialized in the orchestrator
         let (planet_sender, orch_receiver): (
             Sender<PlanetToOrchestrator>,
             Receiver<PlanetToOrchestrator>,
@@ -413,7 +442,6 @@ mod planet{
 
         let explorer_to_orchestrator_channels = (explorer_receiver, explorer_sender);
         let orchestrator_to_explorer_channels = (orch_receiver, orch_sender);
-
         //Construct crab-rave planet
         let mut crab_rave_planet = CrabRaveConstructor::new(
             0,
@@ -425,29 +453,3 @@ mod planet{
 
 }
 
-pub trait ResToString{
-    fn res_to_string(&self) -> String;
-}
-
-impl ResToString for BasicResourceType{
-    fn res_to_string(&self) -> String {
-        match self {
-            BasicResourceType::Carbon=>String::from("carbon"),
-            BasicResourceType::Hydrogen=>String::from("hydrogen"),
-            BasicResourceType::Oxygen=>String::from("oxygen"),
-            BasicResourceType::Silicon=>String::from("silicon"),
-        }
-    }
-}
-impl ResToString for ComplexResourceType{
-    fn res_to_string(&self) -> String {
-        match self {
-            ComplexResourceType::AIPartner=>String::from("AIPartner"),
-            ComplexResourceType::Diamond=>String::from("Diamond"),
-            ComplexResourceType::Life=>String::from("Life"),
-            ComplexResourceType::Robot=>String::from("Robot"),
-            ComplexResourceType::Water=>String::from("Water"),
-            ComplexResourceType::Dolphin => String::from("Dolphin"),
-        }
-    }
-}
