@@ -58,7 +58,8 @@ fn sending_asteroid(orchestrator: &Orchestrator) -> Result<Option<Rocket>, Strin
     }
 }
 
-fn sending_available_cell_request(orchestrator: &Orchestrator) -> Result<(), String> {
+fn sending_available_cell_request(orchestrator: &Orchestrator) -> Result<u32, String> {
+    register_the_explorer(orchestrator)?;
     println!("Sending available cell request...");
     match &orchestrator.explorers[0] {
         Explorer{ planet_id, orchestrator_channels, explorer_to_planet_channels, planet_to_explorer_channels } => {
@@ -71,13 +72,24 @@ fn sending_available_cell_request(orchestrator: &Orchestrator) -> Result<(), Str
                 }
                 None => { panic!("Planet-explorer channels not provided."); }
             }
+            match explorer_to_planet_channels {
+                Some(channels) => {
+                    match channels.0.recv() {
+                        Ok(res) => {
+                            match res {
+                                PlanetToExplorer::AvailableEnergyCellResponse { available_cells } => {
+                                    Ok(available_cells)
+                                }
+                                _ => panic!("Unexpected response to AvailableEnergyCellRequest.")
+                            }
+                        }
+                        Err(err) => { panic!("Failed to receive AvailableEnergyCellResponse: {}", err); }
+                    }
+                }
+                None => { panic!("Planet-explorer channels not provided."); }
+            }
         }
     }
-
-    // TODO: explorer should receive the response with the index of the cell (Some(idx) or None)
-    // this has to be done when the explorer is implemented, (the return type of this function could be changed to Result<Option<u32>, String>)
-
-    Ok(())
 }
 
 fn register_the_explorer(orchestrator: &Orchestrator) -> Result<(), String> {
@@ -713,12 +725,17 @@ fn t11_charged_cell_request_with_one_charged_cell()->Result<(),String>{
                 _ => panic!("Unexpected response to StartPlanetAI.")
             }
         }
-        Err(err)=>{ panic!("Failed to start planet AI: {}.", err); }
+        Err(err)=>{ println!("Failed to start planet AI: {}.", err); }
     }
 
     sending_sunray(&orchestrator)?;
 
-    sending_available_cell_request(&orchestrator)?;
+    register_the_explorer(&orchestrator)?;
+
+    match sending_available_cell_request(&orchestrator) {
+        Ok(available_cells) => println!("Planet available cells: {:?}", available_cells),
+        Err(err)=> panic!("Failed to send available cell request: {}", err),
+    }
 
     let result = killing_planet(&orchestrator);
 
@@ -765,7 +782,10 @@ fn t12_charged_cell_request_with_no_charged_cell()->Result<(),String> {
         Err(err)=>{ panic!("Failed to start planet AI: {}.", err); }
     }
 
-    sending_available_cell_request(&orchestrator)?;
+    match sending_available_cell_request(&orchestrator) {
+        Ok(available_cells) => println!("Planet available cells: {:?}", available_cells),
+        Err(err)=> panic!("Failed to send available cell request: {}", err),
+    }
 
     let result = killing_planet(&orchestrator);
 

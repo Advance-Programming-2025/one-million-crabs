@@ -19,6 +19,8 @@ use common_game::logging::{ActorType, Channel, Payload, EventType, LogEvent};
 use common_game::logging::EventType::{MessageOrchestratorToPlanet, MessagePlanetToExplorer, MessagePlanetToOrchestrator};
 use crossbeam_channel::internal::SelectHandle;
 use log::max_level;
+use crate::components::energy_stacks::N_CELLS;
+
 ///////////////////////////////////////////////////////////////////////////////////////////
 // CrabRave Constructor
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -194,18 +196,15 @@ impl PlanetAI for AI {
     ) -> Option<PlanetToExplorer> {
         match msg {
             ExplorerToPlanet::AvailableEnergyCellRequest { explorer_id: id } => {
-                // restituisce la prima cell carica, se c'è
-                // DO NOT REMOVE -> the following commented lines are the old implementation, so do not remove them till the final decision of the implementation
-                // for i in 0..N_CELLS {
-                //     if state.cell(i).is_charged() {
-                //         return Some(PlanetToExplorer::AvailableEnergyCellResponse {
-                //             available_cells: i as u32,
-                //         });
-                //     }
-                // }
-                // None
 
                 let mut payload_ris = Payload::new();
+
+                let mut n_available_cells = 0;
+                for i in 0..N_CELLS {
+                    if state.cell(i).is_charged() {
+                        n_available_cells += 1;
+                    }
+                }
 
                 let mut ris=None;
                 if let Some(idx) = peek_charged_cell_index() {
@@ -213,7 +212,7 @@ impl PlanetAI for AI {
                     payload_ris.insert(String::from("Result"), "EnergyCell available".to_string());
                     payload_ris.insert(String::from("EnergyCell index"), format!("{}", idx));
                     ris= Some(PlanetToExplorer::AvailableEnergyCellResponse {
-                        available_cells: idx
+                        available_cells: n_available_cells,
                     })
                 }
                 else{
