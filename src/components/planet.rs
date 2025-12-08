@@ -50,17 +50,16 @@ impl CrabRaveConstructor {
         explorer_channels: Receiver<ExplorerToPlanet>,
     ) -> Result<Planet, String> {
         let (planet_type, ai, gen_rules, comb_rules, orchestrator_channels, explorer_channels) = (
-            PlanetType::C,
+            PlanetType::D,
             AI::new(),
             vec![Carbon],
-            vec![Diamond],
+            vec![],
             orchestrator_channels,
             explorer_channels,
         );
         //LOG
         let mut payload= Payload::new();
         payload.insert(String::from("gen_rules"), gen_rules.iter().map(|x| x.res_to_string()+", ").collect());
-        payload.insert(String::from("comb_rules"), comb_rules.iter().map(|x| x.res_to_string()+", ").collect());
         payload.insert("Message".to_string(), "New planet created".to_string());
         //it would be nice to log if the orchestrator is connected but i don't think is possible neither with std::sync nor with crossbeam_channel
         // without actually send and receive something
