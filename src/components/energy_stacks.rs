@@ -9,7 +9,7 @@ pub mod stacks {
     pub(crate) static CHARGED_CELL_STACK: Mutex<Vec<u32>> = Mutex::new(Vec::new());
     pub fn initialize_free_cell_stack(){
 
-        //initialize the free cell stack with all of the possible indexes
+        //initialize the free cell stack with all the possible indexes
         let free_cell_stack = FREE_CELL_STACK.lock();
         match free_cell_stack {
             Ok(mut vec) => {
@@ -67,7 +67,9 @@ pub mod stacks {
         let free_cell_stack = FREE_CELL_STACK.lock();
         match free_cell_stack {
             Ok(mut vec) => {
-                vec.push(index);
+                if vec.len() < N_CELLS {
+                    vec.push(index);
+                }
             }
             Err(err) => {
                 println!("{}", err);
@@ -78,7 +80,9 @@ pub mod stacks {
         let charged_cell_stack = CHARGED_CELL_STACK.lock();
         match charged_cell_stack {
             Ok(mut vec) => {
-                vec.push(index);
+                if vec.len() < N_CELLS {
+                    vec.push(index);
+                }
             }
             Err(err) => {
                 println!("{}", err);

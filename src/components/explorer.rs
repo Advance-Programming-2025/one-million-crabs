@@ -8,13 +8,14 @@ use common_game::{components::planet::Planet, protocols::messages::{
 
 pub type BagType = u32;
 
+#[derive(Debug, Clone)]
 pub struct Explorer {
-    planet_id: Option<u32>, //I assume that the travel isn't instant so I put an Option we should manage the case the planet explodes
-    orchestrator_channels: (
+    pub planet_id: Option<u32>, //I assume that the travel isn't instant so I put an Option we should manage the case the planet explodes
+    pub orchestrator_channels: (
         Receiver<OrchestratorToExplorer>,
         Sender<ExplorerToOrchestrator<BagType>>,
     ),
-    planet_channels: Option<(
+    pub planet_channels: Option<(
         Receiver<PlanetToExplorer>,
         Sender<ExplorerToPlanet>,
     )>,
