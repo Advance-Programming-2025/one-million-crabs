@@ -16,14 +16,28 @@ use common_game::protocols::messages::{
 use crate::components::energy_stacks::stacks::{initialize_free_cell_stack, push_free_cell, push_charged_cell, peek_charged_cell_index, get_free_cell_index, get_charged_cell_index};
 use common_game::protocols::messages::OrchestratorToPlanet::Asteroid;
 use common_game::logging::{ActorType, Channel, Payload, EventType, LogEvent};
-use common_game::logging::Channel::{Debug, Info};
 use common_game::logging::EventType::{MessageOrchestratorToPlanet, MessagePlanetToOrchestrator};
 use crossbeam_channel::internal::SelectHandle;
 use log::max_level;
 ///////////////////////////////////////////////////////////////////////////////////////////
 // CrabRave Constructor
 ///////////////////////////////////////////////////////////////////////////////////////////
-
+const RCV_MSG_LOG_CHNL: Channel=Channel::Info; // change this 2 in order to change the channel of the logs
+const ACK_MSG_LOG_CHNL: Channel=Channel::Info;
+#[macro_export]
+macro_rules! log_msg {
+    ($event:expr, $channel:expr) => {
+        {
+            match $channel{
+                Channel::Info => {log::info!("{}", $event);},
+                Channel::Debug => {log::debug!("{}", $event);},
+                Channel::Error=>{log::error!("{}", $event);},
+                Channel::Trace=>{log::trace!("{}", $event);},
+                Channel::Warning=>{log::warn!("{}", $event);},
+            }
+        }
+    };
+}
 pub struct CrabRaveConstructor;
 
 impl CrabRaveConstructor {
@@ -107,10 +121,11 @@ impl PlanetAI for AI {
                 payload.insert("PlanetState".to_string(), format!("{:?}",PlanetState::to_dummy(&state)));
                 payload.insert(String::from("Message"), String::from("Internal state request"));
                 let event= LogEvent::new(ActorType::Orchestrator, 0u64, ActorType::Planet, state.id().clone().to_string(), EventType::MessageOrchestratorToPlanet, Channel::Info, payload);
-                log::info!("{}", event);
+                log_msg!(event, RCV_MSG_LOG_CHNL);
                 let mut payload_ris=Payload::new();
                 payload_ris.insert(String::from("ACK Response of InternalStateRequest"), format!("planet_id: {:?}, planet_state: {:?}", state.id().clone(),PlanetState::to_dummy(&state)));
-                let event_ris=LogEvent::new(ActorType::Planet, state.id().clone(), ActorType::Orchestrator, "0".to_string(), MessagePlanetToOrchestrator, Info, payload_ris);
+                let event_ris=LogEvent::new(ActorType::Planet, state.id().clone(), ActorType::Orchestrator, "0".to_string(), MessagePlanetToOrchestrator, Channel::Info, payload_ris);
+                log_msg!(event_ris, ACK_MSG_LOG_CHNL);
                 //LOG
                 Some(PlanetToOrchestrator::InternalStateResponse {
                     planet_id: state.id().clone(),
@@ -130,28 +145,34 @@ impl PlanetAI for AI {
                 //     }
                 // }
                 // None
+                let mut payload_ris = Payload::new();
                 let mut ris=None;
                 if let Some(idx) = get_free_cell_index() {
                     state.cell_mut(idx as usize).charge(sunray);
                     push_charged_cell(idx);
+
+                    payload_ris.insert("Message".to_string(), "SunrayAck".to_string());
+                    payload_ris.insert(String::from("Result"), String::from("EnergyCell charged"));
+                    payload_ris.insert(String::from("EnergyCell index"), format!("{}", idx));
+                    payload_ris.insert(String::from("Response data"), format!("planet_id: {}", state.id().clone()));
+
                     ris = Some(PlanetToOrchestrator::SunrayAck {
                         planet_id: state.id().clone(),
                     })
                 }
+                else{
+                    payload_ris.insert("Message".to_string(), "SunrayAck".to_string());
+                    payload_ris.insert(String::from("Result"), String::from("No free cell found"));
+                }
 
                 //LOG
                 let mut payload = Payload::new();
-                if ris.is_some() {
-                    payload.insert("return value".to_string(), "Some".to_string());
-                }
-                else{
-                    payload.insert("return value".to_string(), "None".to_string());
-                }
                 payload.insert(String::from("Message"), String::from("Sunray"));
                 let event=LogEvent::new(ActorType::Orchestrator, 0u64, ActorType::Planet, state.id().clone().to_string(), EventType::MessageOrchestratorToPlanet, Channel::Info, payload);
-                log::info!("{}", event);
+                log_msg!(event, RCV_MSG_LOG_CHNL);
+                let event_ris=LogEvent::new(ActorType::Planet, state.id().clone(), ActorType::Orchestrator, "0".to_string(), MessagePlanetToOrchestrator, Channel::Info, payload_ris);
+                log_msg!(event_ris, ACK_MSG_LOG_CHNL);
                 //LOG
-                //TODO add log for the response
                 ris
             }
             _ => {
@@ -159,7 +180,7 @@ impl PlanetAI for AI {
                 let mut payload = Payload::new();
                 payload.insert(String::from("Message"), "message behaviour not defined".to_string());
                 let event=LogEvent::new(ActorType::Orchestrator, 0u64, ActorType::Planet, state.id().clone().to_string(), EventType::MessageOrchestratorToPlanet, Channel::Info, payload);
-                log::info!("{}", event); //TODO cambiarla in error
+                log_msg!(event, Channel::Error); 
                 None
             },
         }
@@ -441,7 +462,7 @@ impl PlanetAI for AI {
         else{
             payload.insert("Result".to_string(), "a rocket is available".to_string());
         }
-        let event=LogEvent::new(ActorType::Orchestrator, 0u64, ActorType::Planet, state.id().clone().to_string(), MessageOrchestratorToPlanet, Debug, payload);
+        let event=LogEvent::new(ActorType::Orchestrator, 0u64, ActorType::Planet, state.id().clone().to_string(), MessageOrchestratorToPlanet, Channel::Debug, payload);
         log::info!("{}", event);
         ris
         //shouldn't be able to get here, but just in case...
@@ -452,7 +473,7 @@ impl PlanetAI for AI {
         //println!("Planet {} AI started", state.id());
         let mut payload= Payload::new();
         payload.insert("Message".to_string(), "Planet AI started".to_string());
-        let event=LogEvent::new(ActorType::Orchestrator, 0u64, ActorType::Planet, state.id().clone().to_string(), MessageOrchestratorToPlanet, Debug, payload);
+        let event=LogEvent::new(ActorType::Orchestrator, 0u64, ActorType::Planet, state.id().clone().to_string(), MessageOrchestratorToPlanet, Channel::Debug, payload);
         log::info!("{}", event);
         // TODO non ho capito bene cosa deve fare planet.ai.start, deve creare il thread o lo fa l'orchestrator?
         // Mi sembra che lo start AI semplicemente dia il via al loop che permette l'AI di gestire le azioni
@@ -464,7 +485,7 @@ impl PlanetAI for AI {
         //println!("Planet AI stopped");
         let mut payload= Payload::new();
         payload.insert("Message".to_string(), "Planet AI started".to_string());
-        let event=LogEvent::new(ActorType::Orchestrator, 0u64, ActorType::Planet, _state.id().clone().to_string(), MessageOrchestratorToPlanet, Debug, payload);
+        let event=LogEvent::new(ActorType::Orchestrator, 0u64, ActorType::Planet, _state.id().clone().to_string(), MessageOrchestratorToPlanet, Channel::Debug, payload);
         log::info!("{}", event);
         // TODO stessa cosa di "start"
     }
