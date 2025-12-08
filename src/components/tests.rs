@@ -408,19 +408,19 @@ fn t04_failure_resource_request() -> Result<(), String> {
 //         Some(p)=>p,
 //         None=>return Err("Cannot find any planet to pop".to_string()),
 //     };
-// 
+//
 //     println!("Creating planet thread...");
 //     let handle = thread::spawn(move ||->Result<(), String>{
 //         println!("Planet running...");
 //         planet1.run()
 //     });
-// 
+//
 //     println!("Start Planet...");
 //     match orchestrator.planet_channels.1.send(OrchestratorToPlanet::StartPlanetAI) {
 //         Ok(_) => { println!("Planet AI started."); },
 //         Err(err)=>{ panic!("Failed to start planet AI: {}", err); },
 //     }
-// 
+//
 //     println!("Waiting for response...");
 //     match orchestrator.planet_channels.0.recv(){
 //         Ok(res) => {
@@ -433,13 +433,13 @@ fn t04_failure_resource_request() -> Result<(), String> {
 //         }
 //         Err(err)=>{ panic!("Failed to start planet AI: {}.", err); }
 //     }
-// 
+//
 //     println!("Sending sunray...");
 //     match orchestrator.planet_channels.1.send(OrchestratorToPlanet::Sunray(orchestrator.forge.generate_sunray())) {
 //         Ok(_) => {println!("Sunray sent.")},
 //         Err(err)=>{ panic!("Failed to send sunray: {}.", err); }
 //     }
-// 
+//
 //     println!("Waiting for response...");
 //     let result_sunray: Result<(), RecvError> = match orchestrator.planet_channels.0.recv(){
 //         Ok(res) => {
@@ -454,13 +454,13 @@ fn t04_failure_resource_request() -> Result<(), String> {
 //         Err(_) => {
 //             panic!("Something went wrong in receiving the SunrayAck."); }
 //     };
-// 
+//
 //     println!("Sending asteroid...");
 //     match orchestrator.planet_channels.1.send(OrchestratorToPlanet::Asteroid(orchestrator.forge.generate_asteroid())){
 //         Ok(_) => { println!("Asteroid sent."); },
 //         Err(err)=>{ panic!("Failed to send asteroid: {}.", err); }
 //     }
-// 
+//
 //     println!("Waiting for response...");
 //     let result = match orchestrator.planet_channels.0.recv(){
 //         Ok(res) => {
@@ -682,6 +682,80 @@ fn t08_available_resources_request()->Result<(),String> {
                         }
                         Ok(_) => { panic!("Unexpected available resource request response."); }
                         Err(err)=>{ panic!("Failed to respond to available resource request: {}", err); }
+                    }
+                }
+            }
+        }
+    }
+
+    let result = killing_planet(&orchestrator);
+
+    match handle.join() {
+        Ok(Ok(_)) => {
+            println!("Planet thread completed successfully");
+            result
+        }
+        Ok(Err(e)) => Err(format!("Planet thread returned error: {}", e)),
+        Err(_) => Err("Planet thread panicked".to_string()),
+    }
+}
+
+#[test]
+fn t09_combination_rules_request()->Result<(),String> {
+    let mut orchestrator = Orchestrator::new()?;
+    let mut planet1 = match orchestrator.galaxy_topology.pop(){
+        Some(p)=>p,
+        None=>return Err("Cannot find any planet to pop".to_string()),
+    };
+
+    println!("Creating planet thread...");
+    let handle = thread::spawn(move ||->Result<(), String>{
+        println!("Planet running...");
+        planet1.run()
+    });
+
+    println!("Start Planet...");
+    match orchestrator.planet_channels.1.send(OrchestratorToPlanet::StartPlanetAI) {
+        Ok(_) => { println!("Planet AI started."); },
+        Err(err)=>{ panic!("Failed to start planet AI: {}", err); },
+    }
+
+    println!("Waiting for response...");
+    match orchestrator.planet_channels.0.recv(){
+        Ok(res) => {
+            match res {
+                PlanetToOrchestrator::StartPlanetAIResult { planet_id } => {
+                    println!("Planet {} AI started.", planet_id);
+                },
+                _ => panic!("Unexpected response to StartPlanetAI.")
+            }
+        }
+        Err(err)=>{ panic!("Failed to start planet AI: {}.", err); }
+    }
+
+    register_the_explorer(&orchestrator)?;
+
+    match &orchestrator.explorers[0] {
+        Explorer { planet_id, orchestrator_channels, explorer_to_planet_channels, planet_to_explorer_channels } => {
+
+            println!("Accessing planet-explorer channels...");
+            match explorer_to_planet_channels {
+                None => { panic!("Planet channels is None."); }
+                Some(channels) => {
+
+                    println!("Sending resource request...");
+                    match channels.1.send(ExplorerToPlanet::SupportedCombinationRequest { explorer_id: 0 }) {
+                        Ok(_) => { println!("Planet supported combination rules request sent."); },
+                        Err(err)=>{ panic!("Failed to generate combination rules request: {}", err); }
+                    }
+
+                    println!("Responding to combination rules request...");
+                    match channels.0.recv() {
+                        Ok(PlanetToExplorer::SupportedCombinationResponse { combination_list }) => {
+                            println!("Planet supported combination rules list: {:?}", combination_list);
+                        }
+                        Ok(_) => { panic!("Unexpected combination rules request response."); }
+                        Err(err)=>{ panic!("Failed to respond to combination rules request: {}", err); }
                     }
                 }
             }
