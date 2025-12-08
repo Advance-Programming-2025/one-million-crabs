@@ -6,6 +6,7 @@ use components::Orchestrator;
 fn main() -> Result<(), String> {
     //Init and check orchestrator
     let mut orchestrator = Orchestrator::new()?;
+    let init = orchestrator.initialize_galaxy()?;
     let running_program = orchestrator.run()?;
 
     Ok(())
