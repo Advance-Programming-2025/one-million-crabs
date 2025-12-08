@@ -108,14 +108,16 @@ pub struct Orchestrator {
 impl Orchestrator {
     //Check and init orchestrator
     pub fn new() -> Result<Self, String> {
-        Ok(Self {
+        let mut new_orch = Self {
             forge: Forge::new()?,
             planets_id: Vec::new(),
             planets: Vec::new(),
             explorers: Vec::new(),
             planet_channels: PlanetChannels::new(),
             explorer_channels: ExplorerChannels::new(),
-        })
+        };
+        new_orch.initialize_galaxy()?;
+        Ok(new_orch)
     }
 
     pub fn initialize_galaxy(&mut self /*_path: &str*/) -> Result<(), String> {
