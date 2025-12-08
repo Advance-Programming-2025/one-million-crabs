@@ -15,10 +15,14 @@ pub struct Explorer {
         Receiver<OrchestratorToExplorer>,
         Sender<ExplorerToOrchestrator<BagType>>,
     ),
-    pub planet_channels: Option<(
+    pub explorer_to_planet_channels: Option<(
         Receiver<PlanetToExplorer>,
         Sender<ExplorerToPlanet>,
     )>,
+    pub planet_to_explorer_channels: Option<(
+        Receiver<ExplorerToPlanet>,
+        Sender<PlanetToExplorer>,
+    )>
 }
 
 impl Explorer {
@@ -32,12 +36,17 @@ impl Explorer {
         explorer_to_planet_channels:(
             Receiver<PlanetToExplorer>,
             Sender<ExplorerToPlanet>,
+        ),
+        planet_to_explorer_channels:(
+            Receiver<ExplorerToPlanet>,
+            Sender<PlanetToExplorer>,
         )
     ) -> Self {
         Self {
             planet_id: planet_id,
             orchestrator_channels: explorer_to_orchestrator_channels,
-            planet_channels: Some(explorer_to_planet_channels),
+            explorer_to_planet_channels: Some(explorer_to_planet_channels),
+            planet_to_explorer_channels: Some(planet_to_explorer_channels),
         }
     }
 }

@@ -61,8 +61,8 @@ fn sending_asteroid(orchestrator: &Orchestrator) -> Result<Option<Rocket>, Strin
 fn sending_available_cell_request(orchestrator: &Orchestrator) -> Result<(), String> {
     println!("Sending available cell request...");
     match &orchestrator.explorers[0] {
-        Explorer{ planet_id, orchestrator_channels, planet_channels} => {
-            match planet_channels {
+        Explorer{ planet_id, orchestrator_channels, explorer_to_planet_channels, planet_to_explorer_channels } => {
+            match explorer_to_planet_channels {
                 Some(channels) => {
                     match channels.1.send(ExplorerToPlanet::AvailableEnergyCellRequest { explorer_id: 0 }) {
                         Ok(_) => { println!("Available EnergyCellRequest sent.") },
@@ -182,10 +182,10 @@ fn t03_correct_resource_request() -> Result<(), String> {
     sending_sunray(&orchestrator)?;
 
     match &orchestrator.explorers[0] {
-        Explorer { planet_id, orchestrator_channels, planet_channels } => {
+        Explorer { planet_id, orchestrator_channels, explorer_to_planet_channels, planet_to_explorer_channels } => {
 
             println!("Accessing planet-explorer channels...");
-            match planet_channels {
+            match explorer_to_planet_channels {
                 None => { panic!("Planet channels is None."); }
                 Some(channels) => {
 
@@ -260,10 +260,10 @@ fn t04_failure_resource_request() -> Result<(), String> {
     }
 
     match &orchestrator.explorers[0] {
-        Explorer { planet_id, orchestrator_channels, planet_channels } => {
+        Explorer { planet_id, orchestrator_channels, explorer_to_planet_channels, planet_to_explorer_channels } => {
 
             println!("Accessing planet-explorer channels...");
-            match planet_channels {
+            match explorer_to_planet_channels {
                 None => { panic!("Planet channels is None."); }
                 Some(channels) => {
 
@@ -611,10 +611,39 @@ fn t08_available_resources_request()->Result<(),String> {
     }
 
     match &orchestrator.explorers[0] {
-        Explorer { planet_id, orchestrator_channels, planet_channels } => {
+        Explorer { planet_id, orchestrator_channels, explorer_to_planet_channels, planet_to_explorer_channels  } => {
+            match planet_to_explorer_channels {
+                None => { panic!("Planet channels is None."); }
+                Some(channels) => {
+                    println!("Registering explorer on planet...");
+
+                    // Invia la richiesta di registrazione tramite l'orchestrator
+                    orchestrator.planet_channels.1
+                        .send(OrchestratorToPlanet::IncomingExplorerRequest {
+                            explorer_id: 0,
+                            new_mpsc_sender: channels.clone().1, // Il sender per rispondere all'explorer
+                        })
+                        .expect("Failed to send IncomingExplorerRequest");
+
+                    // Aspetta la conferma
+                    match orchestrator.planet_channels.0.recv() {
+                        Ok(PlanetToOrchestrator::IncomingExplorerResponse { planet_id, res }) => {
+                            println!("Explorer registered on planet {}", planet_id);
+                            assert!(res.is_ok());
+                        }
+                        Ok(_) => panic!("Unexpected response to IncomingExplorerRequest"),
+                        Err(err) => panic!("Failed to receive IncomingExplorerResponse: {}", err),
+                    }
+                }
+            }
+        }
+    }
+
+    match &orchestrator.explorers[0] {
+        Explorer { planet_id, orchestrator_channels, explorer_to_planet_channels, planet_to_explorer_channels } => {
 
             println!("Accessing planet-explorer channels...");
-            match planet_channels {
+            match explorer_to_planet_channels {
                 None => { panic!("Planet channels is None."); }
                 Some(channels) => {
 
@@ -624,14 +653,14 @@ fn t08_available_resources_request()->Result<(),String> {
                         Err(err)=>{ panic!("Failed to generate resource request: {}", err); }
                     }
 
-                    // println!("Responding to available resource request...");
-                    // match channels.0.recv() {
-                    //     Ok(PlanetToExplorer::SupportedResourceResponse { resource_list }) => {
-                    //         println!("Planet supported resource list: {:?}", resource_list);
-                    //     }
-                    //     Ok(_) => { panic!("Unexpected available resource request response."); }
-                    //     Err(err)=>{ panic!("Failed to respond to available resource request: {}", err); }
-                    // }
+                    println!("Responding to available resource request...");
+                    match channels.0.recv() {
+                        Ok(PlanetToExplorer::SupportedResourceResponse { resource_list }) => {
+                            println!("Planet supported resource list: {:?}", resource_list);
+                        }
+                        Ok(_) => { panic!("Unexpected available resource request response."); }
+                        Err(err)=>{ panic!("Failed to respond to available resource request: {}", err); }
+                    }
                 }
             }
         }

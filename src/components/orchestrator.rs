@@ -77,7 +77,7 @@ impl Orchestrator {
             Receiver<ExplorerToPlanet>,
         ) = unbounded();
 
-        let planet_to_explorer_channels = planet_receiver;
+        let planet_to_explorer_channels = (planet_receiver, planet_sender);
         let explorer_to_planet_channels = (explorer_receiver, explorer_sender);
 
         //explorer-orchestrator and orchestrator-explorer
@@ -97,7 +97,7 @@ impl Orchestrator {
         let mut crab_rave_planet = CrabRaveConstructor::new(
             0,
             planet_to_orchestrator_channels,
-            planet_to_explorer_channels,
+            planet_to_explorer_channels.0.clone(),
         )?;
         // crab_rave_planet.run();
         // self.planet_channels = Some(orchestrator_to_planet_channels);
@@ -106,7 +106,7 @@ impl Orchestrator {
         let galaxy = vec![crab_rave_planet];
 
         //Construct Explorer
-        let explorer = Explorer::new(Some(galaxy[0].id()), explorer_to_orchestrator_channels, explorer_to_planet_channels);
+        let explorer = Explorer::new(Some(galaxy[0].id()), explorer_to_orchestrator_channels, explorer_to_planet_channels, planet_to_explorer_channels);
         let explorers = vec![explorer];
         Ok(
             Self { 
