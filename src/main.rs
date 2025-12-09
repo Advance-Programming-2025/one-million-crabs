@@ -1,3 +1,5 @@
+#![allow(unused_assignments, unused_variables, unused_mut, unused_imports)]
+
 mod components;
 
 use components::Orchestrator;

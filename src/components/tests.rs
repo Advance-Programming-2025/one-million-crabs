@@ -1,3 +1,4 @@
+#![allow(unused_assignments, unused_variables, unused_mut, unused_imports, dead_code)]
 #[cfg(test)]
 use crate::{components::{explorer::BagType, CrabRaveConstructor}};
 use crate::Orchestrator;

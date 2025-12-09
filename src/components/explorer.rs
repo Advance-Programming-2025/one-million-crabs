@@ -1,3 +1,4 @@
+#![allow(unused_assignments, unused_variables, unused_mut, unused_imports, dead_code)]
 //use std::sync::mpsc;
 use crossbeam_channel::{Sender, Receiver, unbounded};
 

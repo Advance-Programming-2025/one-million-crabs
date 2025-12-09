@@ -1,3 +1,4 @@
+#![allow(unused_assignments, unused_variables, unused_mut, unused_imports, dead_code)]
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 //use std::sync::{mpsc, LockResult};
@@ -437,7 +438,6 @@ impl PlanetAI for AI {
                     //LOG
                     return Some(PlanetToExplorer::CombineResourceResponse { complex_response: Err(("no available cell".to_string(),ret1, ret2)) });
                 }
-                None
             }
         }
     }

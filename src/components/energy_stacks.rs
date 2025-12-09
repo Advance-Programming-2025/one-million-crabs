@@ -1,5 +1,3 @@
-use crate::components::energy_stacks::stacks::{CHARGED_CELL_STACK, FREE_CELL_STACK};
-
 pub const N_CELLS: usize = 5; // TODO da cambiare in base al pianeta
 pub mod stacks {
     use std::sync::Mutex;

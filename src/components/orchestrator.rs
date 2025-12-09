@@ -1,3 +1,4 @@
+#![allow(unused_assignments, unused_variables, unused_mut, unused_imports, dead_code)]
 //use std::sync::mpsc;
 use crossbeam_channel::{Sender, Receiver, select_biased, unbounded};
 use std::thread;
@@ -94,7 +95,7 @@ impl Orchestrator {
         let orchestrator_to_explorer_channels = (orch_receiver, orch_sender);
 
         //Construct crab-rave planet
-        let mut crab_rave_planet = CrabRaveConstructor::new(
+        let crab_rave_planet = CrabRaveConstructor::new(
             0,
             planet_to_orchestrator_channels,
             planet_to_explorer_channels.0.clone(),
