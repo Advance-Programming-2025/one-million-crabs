@@ -13,284 +13,194 @@ use common_game::protocols::messages::{
 use crate::components::CrabRaveConstructor;
 use crate::components::explorer::{BagType, Explorer};
 
-//Types for making things clear in comms initialization
-type OPChannels = (Receiver<PlanetToOrchestrator>, Sender<OrchestratorToPlanet>);
-type POChannels = (Receiver<OrchestratorToPlanet>, Sender<PlanetToOrchestrator>);
-type OEChannels = (
-    Receiver<ExplorerToOrchestrator<BagType>>,
-    Sender<OrchestratorToExplorer>,
-);
-type EOChannels = (
-    Receiver<OrchestratorToExplorer>,
-    Sender<ExplorerToOrchestrator<BagType>>,
-);
-
-pub struct PlanetChannels {
-    map: HashMap<u32, (OPChannels, Sender<ExplorerToPlanet>)>,
+pub enum Status{
+    Alive,
+    Pause,
+    Dead,
 }
-impl PlanetChannels {
-    fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-        }
-    }
-    pub fn send(&self, id: u32, msg: OrchestratorToPlanet) -> Result<(), String> {
-        self.map
-            .get(&id)
-            .ok_or_else(|| format!("Planet {} not found", id))?
-            .0
-            .1
-            .send(msg)
-            .map_err(|_| "Planet is disconnected".to_string())
-    }
-
-    pub fn try_recv(&self, id: u32) -> Result<PlanetToOrchestrator, String> {
-        self.map
-            .get(&id)
-            .ok_or_else(|| format!("Planet {} not found", id))?
-            .0
-            .0
-            .try_recv()
-            .map_err(|_| "Planet is disconnected".to_string())
-    }
-
-    pub fn recv(&self, id: u32) -> Result<PlanetToOrchestrator, String> {
-        self.map
-            .get(&id)
-            .ok_or_else(|| format!("Planet {} not found", id))?
-            .0
-            .0
-            .recv()
-            .map_err(|_| "Planet is disconnected".to_string())
-    }
-}
-
-pub struct ExplorerChannels {
-    map: HashMap<u32, (OEChannels, Sender<PlanetToExplorer>)>,
-}
-impl ExplorerChannels {
-    fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-        }
-    }
-    pub fn send(&self, id: u32, msg: OrchestratorToExplorer) -> Result<(), String> {
-        self.map
-            .get(&id)
-            .ok_or_else(|| format!("Planet {} not found", id))?
-            .0
-            .1
-            .send(msg)
-            .map_err(|_| "Explorer is disconnected".to_string())
-    }
-    pub fn recv(&self, id: u32) -> Result<ExplorerToOrchestrator<BagType>, String> {
-        self.map
-            .get(&id)
-            .ok_or_else(|| format!("Explorer {} not found", id))?
-            .0
-            .0
-            .recv()
-            .map_err(|_| "Explorer is disconnected".to_string())
-    }
-}
-
 // B generic is there for representing the content type of the bag
 pub struct Orchestrator {
+    // Forge sunray and asteroid
     pub forge: Forge,
-    pub planets_id: Vec<u32>,
-    pub planets: Vec<Planet>,
-    pub explorers: Vec<Explorer>,
+    //Galaxy
+    // pub galaxy_topology: Vec<Vec<bool>>,
+    //Status for each planets and explorers
+    pub planets_status: HashMap<u32, Status>,
+    pub explorer_status: HashMap<u32, Status>,
+    //Communication channels for sending messages to planets and explorers
+    pub planet_channels: HashMap<u32, (Sender<OrchestratorToPlanet>, Sender<ExplorerToPlanet>)>,
+    pub explorer_channels: HashMap<u32, (Sender<OrchestratorToExplorer>, Sender<PlanetToExplorer>)>,
 
-    pub planet_channels: PlanetChannels,
-    pub explorer_channels: ExplorerChannels,
+
+    //Channel to clone for the planets and for receiving Planet Messages
+    pub sender_planet_orch: Sender<PlanetToOrchestrator>,
+    pub recevier_orch_planet: Receiver<PlanetToOrchestrator>,
+
+    //Channel to clone for the explorer and for receiving Explorer Messages
+    pub sender_explorer_orch: Sender<ExplorerToOrchestrator<BagType>>,
+    pub receiver_orch_explorer:Receiver<ExplorerToOrchestrator<BagType>>,
+
 }
 
 impl Orchestrator {
+    
+    
     //Check and init orchestrator
     pub fn new() -> Result<Self, String> {
-        let mut new_orch = Self {
+        let (sender_planet_orch, recevier_orch_planet) = unbounded();
+        let (sender_explorer_orch, receiver_orch_explorer) = unbounded();
+
+        let new_orch = Self {
             forge: Forge::new()?,
-            planets_id: Vec::new(),
-            planets: Vec::new(),
-            explorers: Vec::new(),
-            planet_channels: PlanetChannels::new(),
-            explorer_channels: ExplorerChannels::new(),
+            // galaxy_topology: Vec::new(),
+            planets_status: HashMap::new(),
+            explorer_status: HashMap::new(),
+            planet_channels: HashMap::new(),
+            explorer_channels: HashMap::new(),
+            sender_planet_orch,
+            recevier_orch_planet,
+            sender_explorer_orch,
+            receiver_orch_explorer,
         };
-        new_orch.initialize_galaxy()?;
         Ok(new_orch)
     }
 
     pub fn initialize_galaxy(&mut self /*_path: &str*/) -> Result<(), String> {
-        // Orchestrator know the file path where the galaxy topology is written and also the type of each planet
-        /*
-           Steps of initialization:
-           1. read the line to make a planet (at the moment one planet so there is no loop and linear implementation)
-           2. generate the id - the id generator methos should be on the orchestrator cause is the one to define everything
-           3. generate all the communication channels with the planet
-           3. generate the planet - if it fails then handle the error
-           4. if planet is generated succefully then add it to the topology
-        */
-
-        self.add_explorer(1); //explorer cannot go wrong
-        let _init_new_planet = self.add_planet(0)?;
+        //the id 0 should be free because it represent the space
+        let _init_new_planet = self.add_planet(1)?;
+        let _init_new_planet = self.add_planet(2)?;
         Ok(())
     }
     pub fn add_planet(&mut self, id: u32) -> Result<(), String> {
         let (
-            orchestrator_to_planet_channels,
-            planet_to_orchestrator_channels,
-            explorer_sender,
-            planet_receiver,
+            sender_orchestrator,
+            receiver_orchestrator,
+            sender_explorer,
+            receiver_explorer,
         ) = Orchestrator::init_comms_planet();
 
+        let planet_to_orchestrator_channels = (receiver_orchestrator, self.sender_planet_orch.clone());
         //Construct crab-rave planet
-        let new_planet =
-            CrabRaveConstructor::new(id, planet_to_orchestrator_channels, planet_receiver)?;
+        let mut new_planet =
+            CrabRaveConstructor::new(id, planet_to_orchestrator_channels, receiver_explorer)?;
 
-        //Map comms for orchestrator
-        self.planet_channels.map.insert(
+        //Update HashMaps
+        self.planets_status.insert(new_planet.id(), Status::Pause);
+        self.planet_channels.insert(
             new_planet.id(),
-            (orchestrator_to_planet_channels, explorer_sender),
+            (sender_orchestrator, sender_explorer),
         );
         //Add new planet id to the list
-        self.planets_id.push(new_planet.id());
-        //Add new planet to the list
-        self.planets.push(new_planet);
+        // self.planets_id.push(new_planet.id());
+        // //Add new planet to the list
+        // self.planets.push(new_planet);
 
+        thread::spawn(move||->Result<(),String>{
+            new_planet.run()
+        });
         Ok(())
     }
     pub fn add_explorer(&mut self, id: u32) {
         //Create the comms for the new explorer
         let (
-            orchestrator_to_explorer_channels,
-            explorer_to_orchestrator_channels,
-            planet_sender,
-            explorer_receiver,
+            sender_orch,
+            receiver_orch,
+            sender_planet,
+            receiver_planet,
         ) = Orchestrator::init_comms_explorers();
 
         //Construct Explorer
-        let explorer = Explorer::new(
+        let new_explorer = Explorer::new(
             id,
             None,
-            explorer_to_orchestrator_channels,
-            explorer_receiver,
+            (receiver_orch, self.sender_explorer_orch.clone()),
+            receiver_planet,
         );
 
-        //Map
-        self.explorer_channels.map.insert(
-            explorer.id(),
-            (orchestrator_to_explorer_channels, planet_sender),
+        //Update HashMaps
+        self.explorer_status.insert(new_explorer.id(), Status::Pause);
+        self.explorer_channels.insert(
+            new_explorer.id(),
+            (sender_orch, sender_planet),
         );
-        self.explorers.push(explorer);
+
+        // self.explorers.push(explorer);
+        //Spawn the corresponding thread for the explorer
+        thread::spawn(||->Result<(), String>{
+            let _ = new_explorer; //TODO implement a run function for explorer to interact with orchestrator
+            Ok(())
+        });
     }
     fn init_comms_planet() -> (
-        OPChannels,
-        POChannels,
+        Sender<OrchestratorToPlanet>,
+        Receiver<OrchestratorToPlanet>,
         Sender<ExplorerToPlanet>,
         Receiver<ExplorerToPlanet>,
     ) {
-        //planet-orch and orch-planet
-        let (planet_sender, orch_receiver): (
-            Sender<PlanetToOrchestrator>,
-            Receiver<PlanetToOrchestrator>,
-        ) = unbounded();
-        let (orch_sender, planet_receiver): (
+        //orch-planet
+        let (sender_orch, receiver_orch): (
             Sender<OrchestratorToPlanet>,
             Receiver<OrchestratorToPlanet>,
         ) = unbounded();
 
-        let orchestrator_to_planet_channels = (orch_receiver, orch_sender);
-        let planet_to_orchestrator_channels = (planet_receiver, planet_sender);
-
         //explorer-planet
-        let (explorer_sender, planet_receiver): (
+        let (sender_explorer, receiver_explorer): (
             Sender<ExplorerToPlanet>,
             Receiver<ExplorerToPlanet>,
         ) = unbounded();
 
         (
-            orchestrator_to_planet_channels,
-            planet_to_orchestrator_channels,
-            explorer_sender,
-            planet_receiver,
+            sender_orch,
+            receiver_orch,
+            sender_explorer,
+            receiver_explorer,
         )
     }
-
     fn init_comms_explorers() -> (
-        OEChannels,
-        EOChannels,
+        Sender<OrchestratorToExplorer>,
+        Receiver<OrchestratorToExplorer>,
         Sender<PlanetToExplorer>,
         Receiver<PlanetToExplorer>,
     ) {
-        //explorer-orchestrator and orchestrator-explorer
-        let (explorer_sender, orch_receiver): (
-            Sender<ExplorerToOrchestrator<BagType>>,
-            Receiver<ExplorerToOrchestrator<BagType>>,
-        ) = unbounded();
-        let (orch_sender, explorer_receiver): (
+        let (sender_orch, receiver_orch): (
             Sender<OrchestratorToExplorer>,
             Receiver<OrchestratorToExplorer>,
         ) = unbounded();
 
-        let orchestrator_to_explorer_channels = (orch_receiver, orch_sender);
-        let explorer_to_orchestrator_channels = (explorer_receiver, explorer_sender);
-
-        let (planet_sender, explorer_receiver): (
+        let (sender_planet, receiver_planet): (
             Sender<PlanetToExplorer>,
             Receiver<PlanetToExplorer>,
         ) = unbounded();
 
         (
-            orchestrator_to_explorer_channels,
-            explorer_to_orchestrator_channels,
-            planet_sender,
-            explorer_receiver,
+            sender_orch,
+            receiver_orch,
+            sender_planet,
+            receiver_planet,
         )
     }
 
     //The return is Result<(), String> because if an error occur it go back to the main that finishes
     // I don't know if there are better approach but I think it is pretty elegant
-    pub fn run(&mut self) -> Result<(), String> {
-        let mut planet1 = match self.planets.pop() {
-            Some(p) => p,
-            None => return Err("Cannot find any planet to pop".to_string()),
-        };
+    pub fn run_example(&mut self) -> Result<(), String> {
 
-        println!("Creating planet thread...");
-        thread::spawn(move || -> Result<(), String> {
-            println!("Planet running...");
-            let _success = planet1.run()?;
-            Ok(())
-        });
+        //Start all the planets AI
+        for (id, (from_orch, _)) in &self.planet_channels{
+            let send_channel = from_orch.try_send(OrchestratorToPlanet::StartPlanetAI).map_err(|_|"Cannot send message to {id}".to_string())?;
+        }
+        let mut count = 0;
+        //Wait all the 
+        loop{
+            if count == self.planet_channels.len(){
+                break;
+            }
+            let receive_channel = self.recevier_orch_planet.recv().map_err(|_|"Cannot receive message from planets".to_string())?;
+            match receive_channel{
+                PlanetToOrchestrator::StartPlanetAIResult { planet_id } => println!("Started PAI: {}", planet_id),
+                _=>{},
+            }
 
-        println!("Start Planet...");
-        let id = self.planets_id[0];
-        let _planet_start = self
-            .planet_channels
-            .send(id, OrchestratorToPlanet::StartPlanetAI)?;
-        loop {
-            println!("Receive planet messages...");
-            let _planet_response = self.planet_channels.try_recv(id)?;
-
-            println!("Send Asteroid to Planet");
-            let _planet_message = self.planet_channels.send(
-                id,
-                OrchestratorToPlanet::Asteroid(self.forge.generate_asteroid()),
-            )?;
-
-            let _planet_response = self.planet_channels.recv(id)?;
-            println!("Planet should have finished running...");
-
-            let _planet_message = match self.planet_channels.send(
-                id,
-                OrchestratorToPlanet::Asteroid(self.forge.generate_asteroid()),
-            ) {
-                Ok(_) => println!("PLANET STILL WORKING..."),
-                Err(_) => {
-                    println!("Everthing is okey...");
-                    break;
-                }
-            };
+            count+=1;
         }
         Ok(())
     }
