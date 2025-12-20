@@ -15,24 +15,21 @@ macro_rules! debug_println {
 mod components;
 
 use std::io::{self, Write};
-
 use components::Orchestrator;
+use std::env;
 
 //This main let us terminate in an elegant and simple way, returning the error message
 fn main() -> Result<(), String> {
+    // Load env
+    dotenv::dotenv().ok();
     //Init and check orchestrator
     let mut orchestrator = Orchestrator::new()?;
-    // let init = orchestrator.initialize_galaxy()?;
 
     //Give the absolute path for the init file
-    let mut path = String::new();
-    print!("Enter something: ");
-    io::stdout().flush().unwrap(); // ensure prompt prints
-    io::stdin()
-        .read_line(&mut path)
-        .expect("Failed to read line");
+    let file_path = env::var("INPUT_FILE")
+        .expect("Imposta INPUT_FILE nel file .env o come variabile d'ambiente");
 
-    let _init = orchestrator.initialize_galaxy_by_file(path.as_str().trim())?;
+    let _init = orchestrator.initialize_galaxy_by_file(file_path.as_str().trim())?;
     let _running_program = orchestrator.run_example()?;
 
     Ok(())

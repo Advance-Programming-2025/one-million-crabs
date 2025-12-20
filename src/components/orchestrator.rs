@@ -182,16 +182,35 @@ impl Orchestrator {
             .collect::<Result<Vec<Vec<u32>>, String>>()?;
 
         //Print the result
-        input_refined_2.iter().for_each(|row|println!("{:?}", row));
+        debug_println!("Init file content:");
+        input_refined_2.iter().for_each(|row|debug_println!("{:?}", row));
 
         //Initialize matrix of adjecencies
-        
+        let mut adj:Vec<Vec<bool>> = Vec::new();
+        for _ in 0..num_of_planets+1{
+            let v = vec![false; num_of_planets+1];
+            adj.push(v);
+        }
+        debug_println!("Init adj matrix:");
+        adj.iter().for_each(|row|debug_println!("{:?}", row));
+
+
+        for row in input_refined_2{
+            let planet= row[0];
+            for (i, conn) in row.iter().enumerate(){
+                if i != 0{
+                    adj[planet as usize][*conn as usize]=true;
+                    adj[*conn as usize][planet as usize]=true;
+                }
+            }
+        }
+
+        debug_println!("Init adj matrix:");
+        adj.iter().for_each(|row|debug_println!("{:?}", row));
 
         Ok(())
     }
 
-    //The return is Result<(), String> because if an error occur it go back to the main that finishes
-    // I don't know if there are better approach but I think it is pretty elegant
     pub fn run_example(&mut self) -> Result<(), String> {
         //Start all the planets AI
         for (id, (from_orch, _)) in &self.planet_channels {
