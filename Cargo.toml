@@ -9,3 +9,6 @@ common-game = {git = "https://github.com/unitn-ap-2025/common.git"}
 
 crossbeam-channel = "0.5.15"
 env_logger = "0.11.8"
+
+[features]
+debug-prints = []

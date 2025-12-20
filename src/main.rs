@@ -1,3 +1,17 @@
+#[cfg(feature = "debug-prints")]
+#[macro_export]
+macro_rules! debug_println {
+    ($($arg:tt)*) => { println!($($arg)*); };
+}
+
+#[cfg(not(feature = "debug-prints"))]
+#[macro_export]
+macro_rules! debug_println {
+    ($($arg:tt)*) => {
+        ()  // <-- Aggiungi questo per ritornare unit type
+    };
+}
+
 mod components;
 
 use std::io::{self, Write};
