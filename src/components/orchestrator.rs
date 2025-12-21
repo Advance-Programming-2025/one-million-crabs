@@ -1,11 +1,8 @@
-//use std::sync::mpsc;
-use crossbeam_channel::{Receiver, Sender, select_biased, unbounded};
+use crossbeam_channel::{Receiver, Sender, select, unbounded};
 use std::collections::HashMap;
-use std::fmt::format;
-use std::{fs, io, thread};
+use std::{fs, thread};
 
 use common_game::components::forge::Forge;
-use common_game::components::planet::Planet;
 use common_game::protocols::messages::{
     ExplorerToOrchestrator, ExplorerToPlanet, OrchestratorToExplorer, OrchestratorToPlanet,
     PlanetToExplorer, PlanetToOrchestrator,
@@ -106,11 +103,13 @@ impl Orchestrator {
         (sender_orch, receiver_orch, sender_planet, receiver_planet)
     }
     pub fn add_planet(&mut self, id: u32) -> Result<(), String> {
+        //Init comms
         let (sender_orchestrator, receiver_orchestrator, sender_explorer, receiver_explorer) =
             Orchestrator::init_comms_planet();
 
         let planet_to_orchestrator_channels =
             (receiver_orchestrator, self.sender_planet_orch.clone());
+
         //Construct crab-rave planet
         let mut new_planet =
             CrabRaveConstructor::new(id, planet_to_orchestrator_channels, receiver_explorer)?;
@@ -119,11 +118,8 @@ impl Orchestrator {
         self.planets_status.insert(new_planet.id(), Status::Paused);
         self.planet_channels
             .insert(new_planet.id(), (sender_orchestrator, sender_explorer));
-        //Add new planet id to the list
-        // self.planets_id.push(new_planet.id());
-        // //Add new planet to the list
-        // self.planets.push(new_planet);
 
+        debug_println!("Start planet{id} thread");
         thread::spawn(move || -> Result<(), String> { new_planet.run() });
         Ok(())
     }
@@ -154,9 +150,9 @@ impl Orchestrator {
         });
     }
 
-    pub fn initialize_galaxy(&mut self /*_path: &str*/) -> Result<(), String> {
-        let _init_new_planet = self.add_planet(0)?;
-        let _init_new_planet = self.add_planet(1)?;
+    pub fn initialize_galaxy_example(&mut self /*_path: &str*/) -> Result<(), String> {
+        self.add_planet(0)?;
+        self.add_planet(1)?;
         Ok(())
     }
 
@@ -164,9 +160,9 @@ impl Orchestrator {
         //At the moment are allowed only consecutive id from 0 to MAX u32
 
         //Read the input file and handle it
-        let input = fs::read_to_string(path).map_err(|_| format!("Unable to read the input from {path}"))?;
+        let input = fs::read_to_string(path)
+            .map_err(|_| format!("Unable to read the input from {path}"))?;
         let input_refined: Vec<&str> = input.split('\n').collect();
-        let num_of_planets = input_refined.len();
 
         //Check the input and convert the string into u32
         let input_refined_2 = input_refined
@@ -181,45 +177,63 @@ impl Orchestrator {
             })
             .collect::<Result<Vec<Vec<u32>>, String>>()?;
 
+        //Initialize the orchestrator galaxy topology
+        self.initialize_galaxy_by_adj_list(input_refined_2)?;
+
+        Ok(())
+    }
+
+    pub fn initialize_galaxy_by_adj_list(&mut self, adj_list: Vec<Vec<u32>>) -> Result<(), String> {
+        let num_planets = adj_list.len();
         //Print the result
         debug_println!("Init file content:");
-        input_refined_2.iter().for_each(|row|debug_println!("{:?}", row));
+        adj_list.iter().for_each(|row| debug_println!("{:?}", row));
 
         //Initialize matrix of adjecencies
-        let mut adj:Vec<Vec<bool>> = Vec::new();
-        for _ in 0..num_of_planets+1{
-            let v = vec![false; num_of_planets+1];
-            adj.push(v);
+        let mut new_topology: Vec<Vec<bool>> = Vec::new();
+        for _ in 0..num_planets + 1 {
+            let v = vec![false; num_planets + 1];
+            new_topology.push(v);
         }
         debug_println!("Init adj matrix:");
-        adj.iter().for_each(|row|debug_println!("{:?}", row));
+        new_topology
+            .iter()
+            .for_each(|row| debug_println!("{:?}", row));
 
-
-        for row in input_refined_2{
-            let planet= row[0];
-            for (i, conn) in row.iter().enumerate(){
-                if i != 0{
-                    adj[planet as usize][*conn as usize]=true;
-                    adj[*conn as usize][planet as usize]=true;
+        for row in &adj_list {
+            let planet = row[0];
+            for (i, conn) in row.iter().enumerate() {
+                if i != 0 {
+                    new_topology[planet as usize][*conn as usize] = true;
+                    new_topology[*conn as usize][planet as usize] = true;
                 }
             }
         }
 
         debug_println!("Init adj matrix:");
-        adj.iter().for_each(|row|debug_println!("{:?}", row));
+        new_topology
+            .iter()
+            .for_each(|row| debug_println!("{:?}", row));
+
+        //Update orchestrator topology
+        self.galaxy_topology = new_topology;
+
+        //Initialize all the planets give the list of ids
+        let ids_list = adj_list.iter().map(|x| x[0]).collect::<Vec<u32>>(); //Every row should have at least one ids
+        self.initialize_planets_by_ids_list(ids_list.clone())?;
 
         Ok(())
     }
 
-    pub fn run_example(&mut self) -> Result<(), String> {
-        //Start all the planets AI
-        for (id, (from_orch, _)) in &self.planet_channels {
-            let send_channel = from_orch
-                .try_send(OrchestratorToPlanet::StartPlanetAI)
-                .map_err(|_| "Cannot send message to {id}".to_string())?;
+    pub fn initialize_planets_by_ids_list(&mut self, ids_list: Vec<u32>) -> Result<(), String> {
+        for planet_id in ids_list {
+            self.add_planet(planet_id)?;
         }
+        Ok(())
+    }
+
+    fn start_all_planet_ais(&mut self) -> Result<(), String> {
         let mut count = 0;
-        //Wait all the
         loop {
             if count == self.planet_channels.len() {
                 break;
@@ -230,13 +244,29 @@ impl Orchestrator {
                 .map_err(|_| "Cannot receive message from planets".to_string())?;
             match receive_channel {
                 PlanetToOrchestrator::StartPlanetAIResult { planet_id } => {
-                    println!("Started PAI: {}", planet_id);
+                    debug_println!("Started Planet AI: {}", planet_id);
                     self.planets_status.insert(planet_id, Status::Running);
                     count += 1;
                 }
                 _ => {}
             }
         }
+        Ok(())
+    }
+
+    
+
+    pub fn run_example(&mut self) -> Result<(), String> {
+        //Start all the planets AI
+        for (id, (from_orch, _)) in &self.planet_channels {
+            let send_channel = from_orch
+                .try_send(OrchestratorToPlanet::StartPlanetAI)
+                .map_err(|_| "Cannot send message to {id}".to_string())?;
+        }
+
+        //Loop to start all planet ais
+        self.start_all_planet_ais()?;
+
         Ok(())
     }
 }

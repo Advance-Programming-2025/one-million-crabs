@@ -8,13 +8,12 @@ macro_rules! debug_println {
 #[macro_export]
 macro_rules! debug_println {
     ($($arg:tt)*) => {
-        ()  // <-- Aggiungi questo per ritornare unit type
+        ()
     };
 }
 
 mod components;
 
-use std::io::{self, Write};
 use components::Orchestrator;
 use std::env;
 
@@ -29,8 +28,8 @@ fn main() -> Result<(), String> {
     let file_path = env::var("INPUT_FILE")
         .expect("Imposta INPUT_FILE nel file .env o come variabile d'ambiente");
 
-    let _init = orchestrator.initialize_galaxy_by_file(file_path.as_str().trim())?;
-    let _running_program = orchestrator.run_example()?;
+    orchestrator.initialize_galaxy_by_file(file_path.as_str().trim())?;
+    orchestrator.run_example()?;
 
     Ok(())
 }
