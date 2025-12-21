@@ -2,19 +2,15 @@
 Galaxy simulation about Explorers travelling around the galaxy to gather resources, combining them and create some complex resources. They try not to die, watch how they performe during the simulation and you can manually interact with the simulation
 
 
+## How to run it (at the moment)
+Create a new .env file and write in it the variable as in .env.example use the absolute path of the initialization file. 
+After that you can use `cargo run` or `cargo run --features debug-prints` to se all the debug messages. 
 
-
-#### Done
-- Planet implementation - Tommaso, Davide, Marco
-- Logging - Mattia
-
-### In progress
-- Proper implementation of Orchestrator - Marco
-
-#### To do
-- UI - Davide
-- Update logging - Mattia
-- Issue resolver on Planet - Tommaso
+# Task for each member
+- Davide Da Col => UI
+- Mattia Pistollato => Explorer
+- Tommaso Ascolani => Explorer
+- Marco Adami => Explorer
 
 
 
