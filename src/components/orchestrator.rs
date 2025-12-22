@@ -1,11 +1,14 @@
-use crossbeam_channel::{Receiver, Sender, select, unbounded};
+use crossbeam_channel::{Receiver, Sender, select, tick, unbounded};
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 use std::{fs, thread};
 
 use common_game::components::forge::Forge;
+use common_game::protocols::orchestrator_explorer::{
+    ExplorerToOrchestrator, OrchestratorToExplorer,
+};
 use common_game::protocols::orchestrator_planet::{OrchestratorToPlanet, PlanetToOrchestrator};
 use common_game::protocols::planet_explorer::{ExplorerToPlanet, PlanetToExplorer};
-use common_game::protocols::orchestrator_explorer::{ExplorerToOrchestrator, OrchestratorToExplorer};
 
 use crate::components::explorer::{BagType, Explorer};
 use one_million_crabs::planet::create_planet;
@@ -20,6 +23,7 @@ pub enum Status {
 pub struct Orchestrator {
     // Forge sunray and asteroid
     pub forge: Forge,
+
     //Galaxy
     pub galaxy_topology: Vec<Vec<bool>>,
 
@@ -112,8 +116,12 @@ impl Orchestrator {
 
         //Construct crab-rave planet
         //REVIEW check if there is a better way to write it
-        let mut new_planet =
-            create_planet(planet_to_orchestrator_channels.0, planet_to_orchestrator_channels.1, receiver_explorer, id)?;
+        let mut new_planet = create_planet(
+            planet_to_orchestrator_channels.0,
+            planet_to_orchestrator_channels.1,
+            receiver_explorer,
+            id,
+        )?;
 
         //Update HashMaps
         self.planets_status.insert(new_planet.id(), Status::Paused);
@@ -235,7 +243,6 @@ impl Orchestrator {
     }
 
     fn start_all_planet_ais(&mut self) -> Result<(), String> {
-
         for (id, (from_orch, _)) in &self.planet_channels {
             let send_channel = from_orch
                 .try_send(OrchestratorToPlanet::StartPlanetAI)
@@ -264,57 +271,93 @@ impl Orchestrator {
         Ok(())
     }
 
-    fn handle_planet_message(&mut self, msg: PlanetToOrchestrator)->Result<(),String>{
-        match msg{
-            PlanetToOrchestrator::SunrayAck { planet_id }=>{},
-            PlanetToOrchestrator::AsteroidAck { planet_id, rocket }=>{
-                match rocket{
-                    Some(_)=>{
+    fn handle_planet_message(&mut self, msg: PlanetToOrchestrator) -> Result<(), String> {
+        match msg {
+            PlanetToOrchestrator::SunrayAck { planet_id } => {
+                debug_println!("SunrayAck from: {planet_id}")
+            }
+            PlanetToOrchestrator::AsteroidAck { planet_id, rocket } => {
+                debug_println!("AsteroidAck from: {planet_id}");
+                match rocket {
+                    Some(_) => {
                         //TODO some logging function
-                    },
-                    None=>{
+                    }
+                    None => {
                         //If you have the id then surely that planet exist so we can unwrap without worring
                         let sender = &self.planet_channels.get(&planet_id).unwrap().0;
-                        sender.send(OrchestratorToPlanet::KillPlanet).map_err(|_|"Unable to send to planet: {planet_id}")?;
-                        
+                        sender
+                            .send(OrchestratorToPlanet::KillPlanet)
+                            .map_err(|_| "Unable to send to planet: {planet_id}")?;
+
                         //Update planet State
                         self.planets_status.insert(planet_id, Status::Dead);
                         //TODO we need to do a check if some explorer is on that planet
                     }
                 }
-            },
+            }
             // PlanetToOrchestrator::IncomingExplorerResponse { planet_id, res }=>{},
-            PlanetToOrchestrator::InternalStateResponse { planet_id, planet_state }=>{},
-            PlanetToOrchestrator::KillPlanetResult { planet_id }=>{},
+            PlanetToOrchestrator::InternalStateResponse {
+                planet_id,
+                planet_state,
+            } => {}
+            PlanetToOrchestrator::KillPlanetResult { planet_id } => {
+                debug_println!("Planet killed: {}", planet_id);
+            }
             // PlanetToOrchestrator::OutgoingExplorerResponse { planet_id, res }=>{},
-            PlanetToOrchestrator::StartPlanetAIResult { planet_id }=>{},
-            PlanetToOrchestrator::StopPlanetAIResult { planet_id }=>{},
-            PlanetToOrchestrator::Stopped { planet_id }=>{},
-            _=>{}
-            
+            PlanetToOrchestrator::StartPlanetAIResult { planet_id } => {}
+            PlanetToOrchestrator::StopPlanetAIResult { planet_id } => {}
+            PlanetToOrchestrator::Stopped { planet_id } => {}
+            _ => {}
         }
         Ok(())
     }
 
-    fn send_sunray(&self, sender: &Sender<OrchestratorToPlanet>)->Result<(),String>{
-        sender.send(OrchestratorToPlanet::Sunray(self.forge.generate_sunray())).map_err(|_|"Unable to send a sunray to planet: {id}".to_string())
+    fn send_sunray(&self, sender: &Sender<OrchestratorToPlanet>) -> Result<(), String> {
+        sender
+            .send(OrchestratorToPlanet::Sunray(self.forge.generate_sunray()))
+            .map_err(|_| "Unable to send a sunray to planet: {id}".to_string())
     }
-    fn send_sunray_to_all(&self)->Result<(),String>{
-        for (id, (sender, _)) in &self.planet_channels{
-            if *self.planets_status.get(id).unwrap() != Status::Dead{
+    fn send_sunray_to_all(&self) -> Result<(), String> {
+        for (id, (sender, _)) in &self.planet_channels {
+            if *self.planets_status.get(id).unwrap() != Status::Dead {
                 self.send_sunray(sender)?;
             }
         }
         Ok(())
     }
-    
-    fn game(&mut self)->Result<(),String>{
+
+    fn send_asteroid(&self, sender: &Sender<OrchestratorToPlanet>) -> Result<(), String> {
+        sender
+            .send(OrchestratorToPlanet::Asteroid(
+                self.forge.generate_asteroid(),
+            ))
+            .map_err(|_| "Unable to send a sunray to planet: {id}".to_string())
+    }
+    fn send_asteroid_to_all(&self) -> Result<(), String> {
+        for (id, (sender, _)) in &self.planet_channels {
+            if *self.planets_status.get(id).unwrap() != Status::Dead {
+                self.send_asteroid(sender)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn run_only_planets(&mut self) -> Result<(), String> {
+        //Loop to start all planet ais
+        self.start_all_planet_ais()?;
+
+        //Game
+
         /*
             v0 - totally sequencial
             Every message is responded to bloking all the other channels till it is finished
             Sunrays and asteroids are sent to all the planet after a timeout
         */
-        loop{
+        let start = Instant::now();
+        let ticker = tick(Duration::from_millis(100));
+        let mut count = 0;
+
+        loop {
             select! {
                 recv(self.recevier_orch_planet)->msg=>{
                     let msg_unwraped = match msg{
@@ -327,23 +370,58 @@ impl Orchestrator {
                     break;
                     todo!()
                 }
+                recv(ticker)->time=>{
+                    debug_println!("{:?}", start.elapsed());
+
+                    if count!=4{
+                        self.send_sunray_to_all()?;
+                    }else{
+                        self.send_asteroid_to_all()?;
+                    }
+                    count+=1;
+                    count%=5;
+
+                }
             }
         }
+
         Ok(())
     }
 
-    
-    
-
-    pub fn run_example(&mut self) -> Result<(), String> {
-        
-        //Loop to start all planet ais
+    pub fn run_only_planet_sequence(
+        &mut self,
+        mut asteroid_sunray_list: String,
+    ) -> Result<(), String> {
         self.start_all_planet_ais()?;
-        
 
         //Game
-        self.game()?;
+        let start = Instant::now();
+        let ticker = tick(Duration::from_millis(100));
 
+        loop {
+            select! {
+                recv(self.recevier_orch_planet)->msg=>{
+                    let msg_unwraped = match msg{
+                        Ok(res)=>res,
+                        Err(_)=>return Err("Cannot receive message from planets".to_string()),
+                    };
+                    self.handle_planet_message(msg_unwraped)?;
+                }
+                recv(self.receiver_orch_explorer)->msg=>{
+                    break;
+                    todo!()
+                }
+                recv(ticker)->time=>{
+                    debug_println!("{:?}", start.elapsed());
+
+                    match asteroid_sunray_list.pop(){
+                        Some('A')=>self.send_asteroid_to_all()?,
+                        Some('S')=>self.send_sunray_to_all()?,
+                        _=>break,
+                    }
+                }
+            }
+        }
 
         Ok(())
     }

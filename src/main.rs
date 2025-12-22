@@ -29,7 +29,9 @@ fn main() -> Result<(), String> {
         .expect("Imposta INPUT_FILE nel file .env o come variabile d'ambiente");
 
     orchestrator.initialize_galaxy_by_file(file_path.as_str().trim())?;
-    orchestrator.run_example()?;
+    // orchestrator.run_only_planets()?;
+    let sequence = "ASSSSSSSSSSS".to_string();
+    orchestrator.run_only_planet_sequence(sequence)?;
 
     Ok(())
 }
