@@ -243,6 +243,25 @@ impl Orchestrator {
         Ok(())
     }
 
+
+    /// Removes the link between two planets if one of them explodes.
+    /// ``
+    /// Returns Err if the given indexes are out of bounds, Ok otherwise;
+    /// it does NOT currently check wether the link was already set to false beforehand
+    /// 
+    /// * `planet_one_pos` - Position of the first planet in the matrix. Must be a valid index
+    /// * `planet_two_pos` - Position of the second planet in the matrix. Must be a valid index
+    fn destroy_topology_link(&mut self, planet_one_pos: usize, planet_two_pos: usize) -> Result<(),String>{
+        let topology = &mut self.galaxy_topology;
+        if planet_one_pos < topology.len() && planet_two_pos < topology.len() { 
+            topology[planet_one_pos][planet_two_pos] = false;
+            topology[planet_two_pos][planet_one_pos] = false;
+            Ok(())
+        } else {
+            Err("index out of bounds (too large)".to_string())
+        }
+    }
+
     fn start_all_planet_ais(&mut self) -> Result<(), String> {
         for (id, (from_orch, _)) in &self.planet_channels {
             let send_channel = from_orch
