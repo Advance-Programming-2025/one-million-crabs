@@ -20,7 +20,7 @@ pub enum Status {
     Paused,
     Dead,
 }
-// B generic is there for representing the content type of the bag
+
 pub struct Orchestrator {
     // Forge sunray and asteroid
     pub forge: Forge,
@@ -64,6 +64,44 @@ impl Orchestrator{
             receiver_orch_explorer,
         };
         Ok(new_orch)
+    }
+    pub fn reset(&mut self)->Result<(),String>{
+        let ticker = tick(Duration::from_millis(2000));
+        //Kill every thread
+        self.send_planet_kill_to_all()?;
+        loop{
+            select! {
+                recv(self.recevier_orch_planet)->msg=>{
+                    let msg_unwraped = match msg{
+                        Ok(res)=>res,
+                        Err(_)=>return Err("Cannot receive message from planets".to_string()),
+                    };
+                    match msg_unwraped{
+                        PlanetToOrchestrator::KillPlanetResult { planet_id }=>{
+                            self.planets_status.insert(planet_id, Status::Dead);
+                        },
+                        _=>{}
+                    }
+                }
+                recv(ticker)->msg=>{
+                    //After one second every planet should have been killed
+                    for (_, state) in &self.planets_status{
+                        if *state != Status::Dead{
+                            return Err("Not every planet is being killed".to_string());
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        //Reinit orchestrator
+        self.galaxy_topology = Vec::new();
+        self.planets_status= BTreeMap::new();
+        self.explorer_status= BTreeMap::new();
+        self.planet_channels=HashMap::new();
+        self.explorer_channels=HashMap::new();
+        Ok(())
     }
     fn init_comms_planet() -> (
         Sender<OrchestratorToPlanet>,
@@ -116,14 +154,6 @@ impl Orchestrator{
         let planet_to_orchestrator_channels =
             (receiver_orchestrator, self.sender_planet_orch.clone());
 
-        //Construct crab-rave planet
-        //REVIEW check if there is a better way to write it
-        // let mut new_planet = create_planet(
-        //     planet_to_orchestrator_channels.0,
-        //     planet_to_orchestrator_channels.1,
-        //     receiver_explorer,
-        //     id,
-        // )?;
         let mut new_planet = (PLANET_REGISTRY.get(&4).unwrap().as_ref())(
             planet_to_orchestrator_channels.0,
             planet_to_orchestrator_channels.1,
@@ -173,7 +203,6 @@ impl Orchestrator{
         self.add_planet(1)?;
         Ok(())
     }
-
     pub fn initialize_galaxy_by_file(&mut self, path: &str) -> Result<(), String> {
         //At the moment are allowed only consecutive id from 0 to MAX u32
 
@@ -364,12 +393,26 @@ impl Orchestrator {
             .send(OrchestratorToPlanet::Asteroid(
                 self.forge.generate_asteroid(),
             ))
-            .map_err(|_| "Unable to send a sunray to planet: {id}".to_string())
+            .map_err(|_| "Unable to send sunray to planet: {id}".to_string())
     }
     fn send_asteroid_to_all(&self) -> Result<(), String> {
+        //unwrap cannot fail because every id is contained in the map
         for (id, (sender, _)) in &self.planet_channels {
             if *self.planets_status.get(id).unwrap() != Status::Dead {
                 self.send_asteroid(sender)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn send_planet_kill(&self, sender: &Sender<OrchestratorToPlanet>)->Result<(), String>{
+        sender.send(OrchestratorToPlanet::KillPlanet).map_err(|_| "Unable to send kill message to planet: {id}".to_string())
+    }
+    fn send_planet_kill_to_all(&self)->Result<(),String>{
+        for (id, (sender, _)) in &self.planet_channels {
+            //unwrap cannot fail because every id is contained in the map
+            if *self.planets_status.get(id).unwrap() != Status::Dead {
+                self.send_planet_kill(sender)?;
             }
         }
         Ok(())
@@ -467,6 +510,12 @@ impl Orchestrator{
         // for (id, status) in &self.planets_status{
         //     print!("({}, {:?})",id, status);
         // }
-        print!("{:?}", self.planets_status);
+        debug_println!("{:?}", self.planets_status);
+    }
+    pub fn print_galaxy_topology(&self){
+        debug_println!("{:?}", self.galaxy_topology);
+    }
+    pub fn print_orch(&self){
+        debug_println!("Orchestrator running");
     }
 }
