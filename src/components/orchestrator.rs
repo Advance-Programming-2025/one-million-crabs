@@ -203,6 +203,11 @@ impl Orchestrator{
         self.add_planet(1)?;
         Ok(())
     }
+
+    pub fn get_topology(&mut self) -> Vec<Vec<bool>> {
+        return self.galaxy_topology.clone();
+    }
+
     pub fn initialize_galaxy_by_file(&mut self, path: &str) -> Result<(), String> {
         //At the moment are allowed only consecutive id from 0 to MAX u32
 
@@ -287,7 +292,7 @@ impl Orchestrator {
     
 
     /// Removes the link between two planets if one of them explodes.
-    /// ``
+    /// 
     /// Returns Err if the given indexes are out of bounds, Ok otherwise;
     /// it does NOT currently check wether the link was already set to false beforehand
     /// 
