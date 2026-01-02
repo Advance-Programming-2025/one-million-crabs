@@ -1,6 +1,8 @@
 use crossbeam_channel::{Receiver, Sender, select, tick, unbounded};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::RwLock;
 use std::time::{Duration, Instant};
 use std::{fs, thread};
 
@@ -35,12 +37,14 @@ pub enum Status {
     Dead,
 }
 
+pub type GalaxyTopology = Arc<RwLock<Vec<Vec<bool>>>>;
+
 pub struct Orchestrator {
     // Forge sunray and asteroid
     pub forge: Forge,
 
     //Galaxy
-    pub galaxy_topology: Vec<Vec<bool>>,
+    pub galaxy_topology: GalaxyTopology,
 
     //Status for each planets and explorers, BTreeMaps are useful for printing
     pub planets_status: BTreeMap<u32, Status>,
@@ -60,6 +64,15 @@ pub struct Orchestrator {
 
 //Initialization game functions
 impl Orchestrator {
+
+    /// Create a new Galaxy Topology
+    /// ` `
+    /// Function used as shorthand to create a new
+    /// galaxy topology instance
+    fn new_gtop() -> GalaxyTopology {
+        Arc::new(RwLock::new(Vec::new()))
+    }
+
     //Check and init orchestrator
     pub fn new() -> Result<Self, String> {
         let (sender_planet_orch, recevier_orch_planet) = unbounded();
@@ -67,7 +80,7 @@ impl Orchestrator {
 
         let new_orch = Self {
             forge: Forge::new()?,
-            galaxy_topology: Vec::new(),
+            galaxy_topology: Self::new_gtop(),
             planets_status: BTreeMap::new(),
             explorer_status: BTreeMap::new(),
             planet_channels: HashMap::new(),
@@ -110,7 +123,7 @@ impl Orchestrator {
         }
 
         //Reinit orchestrator
-        self.galaxy_topology = Vec::new();
+        self.galaxy_topology = Self::new_gtop();
         self.planets_status = BTreeMap::new();
         self.explorer_status = BTreeMap::new();
         self.planet_channels = HashMap::new();
@@ -283,13 +296,32 @@ impl Orchestrator {
             .for_each(|row| debug_println!("{:?}", row));
 
         //Update orchestrator topology
-        self.galaxy_topology = new_topology;
 
-        //Initialize all the planets give the list of ids
-        let ids_list = adj_list.iter().map(|x| x[0]).collect::<Vec<u32>>(); //Every row should have at least one ids
-        self.initialize_planets_by_ids_list(ids_list.clone())?;
+        let lock_try = match self.galaxy_topology.write() {
+            Ok(mut gtop) => {
+                *gtop = new_topology;
+                //drops the lock just in case
+                drop(gtop);
+                Ok(())
+            },
+            Err(_e) => {
+                debug_println!(
+                    "ERROR galaxy topology lock failed."
+                );
+                Err(())
+            }
+        };
 
-        Ok(())
+        if lock_try.is_ok(){
+            //Initialize all the planets give the list of ids
+                let ids_list = adj_list.iter().map(|x| x[0]).collect::<Vec<u32>>(); //Every row should have at least one ids
+            self.initialize_planets_by_ids_list(ids_list.clone())?;
+            Ok(())
+        } else {
+            Err("rwlock error".to_string())
+        }
+
+        
     }
 
     pub fn initialize_planets_by_ids_list(&mut self, ids_list: Vec<u32>) -> Result<(), String> {
@@ -315,14 +347,23 @@ impl Orchestrator {
         planet_one_pos: usize,
         planet_two_pos: usize,
     ) -> Result<(), String> {
-        let topology = &mut self.galaxy_topology;
-        if planet_one_pos < topology.len() && planet_two_pos < topology.len() {
-            topology[planet_one_pos][planet_two_pos] = false;
-            topology[planet_two_pos][planet_one_pos] = false;
-            Ok(())
-        } else {
-            Err("index out of bounds (too large)".to_string())
+        match self.galaxy_topology.write() {
+            Ok(mut gtop) => {
+                if planet_one_pos < gtop.len() && planet_two_pos < gtop.len() {
+                    gtop[planet_one_pos][planet_two_pos] = false;
+                    gtop[planet_two_pos][planet_one_pos] = false;
+                    drop(gtop);
+                    Ok(())
+                } else {
+                    Err("index out of bounds (too large)".to_string())
+                }
+            },
+            Err(e) => {
+                debug_println!("RwLock failed for destroy_topology_link");
+                Err(e.to_string())
+            }
         }
+        
     }
 
     fn start_all_planet_ais(&mut self) -> Result<(), String> {
@@ -551,5 +592,19 @@ impl Orchestrator {
     }
     pub fn print_orch(&self) {
         debug_println!("Orchestrator running");
+    }
+}
+
+//GUI communication functions
+impl Orchestrator {
+    
+    /// Get a snapshot of the current galaxy topology
+    /// 
+    /// Returns an atomic reference of the current
+    /// galaxy topology. This is made to avoid changing
+    /// the topology from the GUI's side in an improper
+    /// way that might misalign the internal state
+    pub fn get_topology(&self) -> GalaxyTopology {
+        self.galaxy_topology.clone()
     }
 }
