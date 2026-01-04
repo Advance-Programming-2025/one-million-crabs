@@ -435,8 +435,8 @@ impl Orchestrator {
             };
         }
         match err {
-            true => Ok(()),
-            false => {Err("no planet type found".to_string())}
+            false => Ok(()),
+            true => {Err("no planet type found".to_string())}
         }
     }
 }

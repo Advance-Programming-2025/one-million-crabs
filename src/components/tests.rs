@@ -15,6 +15,13 @@ use crate::components::Orchestrator;
 // }); 
 
 #[test]
+fn topology_generation()-> Result<(), String> {
+    println!("topology generation");
+    let mut _orchestrator = Orchestrator::new()?;
+    _orchestrator.initialize_galaxy_by_file("")
+}
+
+#[test]
 fn is_orch_initialized()->Result<(),String>{
     let _orchestrator = Orchestrator::new()?;
     Ok(())
