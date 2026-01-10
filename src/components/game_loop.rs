@@ -6,13 +6,8 @@ use ui_messages::{GameToUi, UiToGame};
 use crate::components::orchestrator::Orchestrator;
 use crate::debug_println;
 use crate::settings;
+use crate::utils::GameState;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GameState {
-    WaitingStart,
-    Running,
-    Paused,
-}
 
 struct GameTick {
     ticker: Receiver<std::time::Instant>,

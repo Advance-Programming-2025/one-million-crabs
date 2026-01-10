@@ -1,6 +1,6 @@
 mod components;
 pub mod settings;
-mod utils_planets;
+mod utils;
 
 pub use components::Game;
 pub use components::game_loop::run_with_ui;

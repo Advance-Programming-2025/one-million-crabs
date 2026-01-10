@@ -14,14 +14,14 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
 use std::{fs, thread};
-
 use crate::components::explorer::{BagType, Explorer};
 use crate::settings::pop_sunray_asteroid_sequence;
-use crate::utils_planets::PLANET_REGISTRY;
-use crate::utils_planets::registry::PlanetType;
-use crate::utils_planets::registry::PlanetType::{
+use crate::utils::state_enums::Status;
+use crate::utils::types::GalaxyTopology;
+use crate::utils::registry::PlanetType::{
     BlackAdidasShoe, Ciuc, HoustonWeHaveABorrow, ImmutableCosmicBorrow, OneMillionCrabs, Rustrelli,
 };
+use crate::utils::registry::{PlanetType, PLANET_REGISTRY};
 
 const LOG_FN_CALL_CHNL: Channel = Channel::Debug;
 const LOG_FN_INT_OPERATIONS: Channel = Channel::Trace;
@@ -42,21 +42,6 @@ macro_rules! debug_println {
         ()
     };
 }
-
-#[derive(PartialEq, Debug)]
-pub enum Status {
-    Running,
-    Paused,
-    Dead,
-}
-
-pub enum GameState {
-    Running,
-    Paused,
-    Exit,
-}
-
-pub type GalaxyTopology = Arc<RwLock<Vec<Vec<bool>>>>;
 
 pub struct Orchestrator {
     // Forge sunray and asteroid

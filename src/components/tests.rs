@@ -6,8 +6,8 @@
 
 #[cfg(test)]
 use crate::components::orchestrator::Orchestrator;
-use crate::utils_planets::registry::PlanetType;
-use crate::components::orchestrator::Status;
+use crate::utils::registry::PlanetType;
+use crate::utils::state_enums::Status;
 
 #[cfg(test)]
 mod tests_core_lifecycle {
@@ -40,7 +40,7 @@ mod tests_core_lifecycle {
 #[cfg(test)]
 mod tests_actor_management {
     use super::*;
-    use crate::utils_planets::registry::PlanetType;
+    use crate::utils::registry::PlanetType;
 
     #[test]
     fn test_membership_add_planet_updates_status_to_paused() {
@@ -171,8 +171,7 @@ mod tests_file_integration {
 mod tests {
     use super::*;
     use std::time::Duration;
-    use crate::utils_planets::registry::PlanetType;
-    use common_game::protocols::orchestrator_planet::PlanetToOrchestrator;
+    use crate::utils::registry::PlanetType;
 
     // --- MACRO CATEGORY: MIXED SITUATIONS ---
     // Testing survival rates when different planet types are combined.

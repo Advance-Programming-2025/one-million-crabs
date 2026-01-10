@@ -2,7 +2,7 @@ use common_game::components::resource::BasicResourceType;
 use once_cell::sync::Lazy;
 
 use super::types::PlanetFactory;
-use crate::utils_planets::registry::PlanetType::{
+use crate::utils::registry::PlanetType::{
     BlackAdidasShoe, Ciuc, HoustonWeHaveABorrow, ImmutableCosmicBorrow, OneMillionCrabs, RustyCrab, Rustrelli,
 };
 use rand::seq::IndexedRandom;

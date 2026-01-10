@@ -1,3 +1,5 @@
+use std::sync::{Arc, RwLock};
+
 use common_game::components::planet::Planet;
 use common_game::protocols::orchestrator_planet::{OrchestratorToPlanet, PlanetToOrchestrator};
 use common_game::protocols::planet_explorer::ExplorerToPlanet;
@@ -13,3 +15,8 @@ pub type PlanetFactory = Box<
         + Send
         + Sync,
 >;
+
+
+pub type GalaxyTopology = Arc<RwLock<Vec<Vec<bool>>>>;
+
+
